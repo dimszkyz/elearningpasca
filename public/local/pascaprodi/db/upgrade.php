@@ -35,5 +35,19 @@ function xmldb_local_pascaprodi_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026071601, 'local', 'pascaprodi');
     }
 
+    if ($oldversion < 2026071602) {
+        if (get_config('local_pascaprodi', 'autoenrolstudents') === false) {
+            set_config('autoenrolstudents', 1, 'local_pascaprodi');
+        }
+        if (get_config('local_pascaprodi', 'autoenrolteachers') === false) {
+            set_config('autoenrolteachers', 1, 'local_pascaprodi');
+        }
+        if (get_config('local_pascaprodi', 'teachernameprefix') === false) {
+            set_config('teachernameprefix', get_string('defaultteachernameprefix', 'local_pascaprodi'), 'local_pascaprodi');
+        }
+
+        upgrade_plugin_savepoint(true, 2026071602, 'local', 'pascaprodi');
+    }
+
     return true;
 }
