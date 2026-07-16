@@ -26,11 +26,25 @@ if ($hassiteconfig) {
         1
     ));
 
+    $settings->add(new admin_setting_heading(
+        'local_pascaprodi/cohortheading',
+        get_string('setting_cohortheading', 'local_pascaprodi'),
+        get_string('setting_cohortheading_desc', 'local_pascaprodi')
+    ));
+
     $settings->add(new admin_setting_configtext(
         'local_pascaprodi/nameprefix',
         get_string('setting_nameprefix', 'local_pascaprodi'),
         get_string('setting_nameprefix_desc', 'local_pascaprodi'),
         get_string('defaultnameprefix', 'local_pascaprodi'),
+        PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_pascaprodi/teachernameprefix',
+        get_string('setting_teachernameprefix', 'local_pascaprodi'),
+        get_string('setting_teachernameprefix_desc', 'local_pascaprodi'),
+        get_string('defaultteachernameprefix', 'local_pascaprodi'),
         PARAM_TEXT
     ));
 
@@ -54,6 +68,26 @@ if ($hassiteconfig) {
         get_string('setting_archiveprefix_desc', 'local_pascaprodi'),
         get_string('defaultarchiveprefix', 'local_pascaprodi'),
         PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_heading(
+        'local_pascaprodi/enrolheading',
+        get_string('setting_enrolheading', 'local_pascaprodi'),
+        get_string('setting_enrolheading_desc', 'local_pascaprodi')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_pascaprodi/autoenrolstudents',
+        get_string('setting_autoenrolstudents', 'local_pascaprodi'),
+        get_string('setting_autoenrolstudents_desc', 'local_pascaprodi'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_pascaprodi/autoenrolteachers',
+        get_string('setting_autoenrolteachers', 'local_pascaprodi'),
+        get_string('setting_autoenrolteachers_desc', 'local_pascaprodi'),
+        1
     ));
 
     $ADMIN->add('localplugins', $settings);
