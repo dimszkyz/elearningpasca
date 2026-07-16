@@ -8,8 +8,10 @@
 
 namespace local_pascaprodi\form;
 
+use local_pascaprodi\manager;
+
 /**
- * Form for assigning a user to a system role and an optional Prodi cohort.
+ * Form for assigning a user to a role and one or more Prodi categories.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -46,26 +48,60 @@ class user_role_form extends \moodleform {
         $mform->addElement('autocomplete', 'userid', get_string('field_user', 'local_pascaprodi'), $useroptions);
         $mform->addRule('userid', get_string('required'), 'required', null, 'client');
 
-        $roles = get_assignable_roles($systemcontext, ROLENAME_ORIGINAL, false);
-        $roleoptions = [0 => get_string('norolechange', 'local_pascaprodi')] + $roles;
-        $mform->addElement('select', 'roleid', get_string('field_systemrole', 'local_pascaprodi'), $roleoptions);
-        $mform->setDefault('roleid', 0);
-        $mform->addHelpButton('roleid', 'field_systemrole', 'local_pascaprodi');
-
-        $cohortoptions = [0 => get_string('nocohortchange', 'local_pascaprodi')];
-        $cohorts = $DB->get_records('cohort', ['visible' => 1], 'name ASC', 'id,name,idnumber');
-        foreach ($cohorts as $cohort) {
-            $label = format_string($cohort->name);
-            if (!empty($cohort->idnumber)) {
-                $label .= ' (' . $cohort->idnumber . ')';
-            }
-            $cohortoptions[(int) $cohort->id] = $label;
+        $roleoptions = [0 => get_string('norolechange', 'local_pascaprodi')];
+        $roles = $DB->get_records('role', null, 'sortorder ASC', 'id,name,shortname,archetype');
+        foreach ($roles as $role) {
+            $label = role_get_name($role, $systemcontext, ROLENAME_ORIGINAL) . ' (' . $role->shortname . ')';
+            $roleoptions[(int) $role->id] = $label;
         }
 
-        $mform->addElement('autocomplete', 'cohortid', get_string('field_cohort', 'local_pascaprodi'), $cohortoptions);
-        $mform->setDefault('cohortid', 0);
-        $mform->addHelpButton('cohortid', 'field_cohort', 'local_pascaprodi');
+        $mform->addElement('select', 'roleid', get_string('field_accessrole', 'local_pascaprodi'), $roleoptions);
+        $mform->setDefault('roleid', 0);
+        $mform->addHelpButton('roleid', 'field_accessrole', 'local_pascaprodi');
+
+        $categoryoptions = [];
+        $categories = $DB->get_records('course_categories', null, 'sortorder ASC', 'id,name,path');
+        foreach ($categories as $category) {
+            $path = trim((string) $category->path, '/');
+            $depth = $path === '' ? 0 : max(0, substr_count($path, '/') - 0);
+            $categoryoptions[(int) $category->id] = str_repeat('— ', $depth) . format_string($category->name);
+        }
+
+        $mform->addElement('autocomplete', 'categoryids', get_string('field_categories', 'local_pascaprodi'), $categoryoptions, [
+            'multiple' => true,
+        ]);
+        $mform->addHelpButton('categoryids', 'field_categories', 'local_pascaprodi');
 
         $this->add_action_buttons(false, get_string('savechanges'));
+    }
+
+    /**
+     * Validate role and category selection.
+     */
+    public function validation($data, $files): array {
+        global $DB;
+
+        $errors = parent::validation($data, $files);
+        $roleid = (int) ($data['roleid'] ?? 0);
+        $categoryids = array_values(array_filter(array_map('intval', (array) ($data['categoryids'] ?? []))));
+
+        if ($roleid <= 0 && !$categoryids) {
+            $errors['categoryids'] = get_string('error_select_role_or_category', 'local_pascaprodi');
+            return $errors;
+        }
+
+        if (count($categoryids) > 1) {
+            $allowmultiple = false;
+            if ($roleid > 0) {
+                $role = $DB->get_record('role', ['id' => $roleid]);
+                $allowmultiple = $role ? manager::is_category_role($role) : false;
+            }
+
+            if (!$allowmultiple) {
+                $errors['categoryids'] = get_string('error_multiple_categories_teacher_role', 'local_pascaprodi');
+            }
+        }
+
+        return $errors;
     }
 }
