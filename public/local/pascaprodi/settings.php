@@ -75,6 +75,28 @@ if ($hassiteconfig) {
         1
     ));
 
+    $settings->add(new admin_setting_heading(
+        'local_pascaprodi/apisyncheading',
+        get_string('setting_apisyncheading', 'local_pascaprodi'),
+        get_string('setting_apisyncheading_desc', 'local_pascaprodi')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_pascaprodi/syncapiurl',
+        get_string('setting_syncapiurl', 'local_pascaprodi'),
+        get_string('setting_syncapiurl_desc', 'local_pascaprodi'),
+        \local_pascaprodi\manager::DEFAULT_API_URL,
+        PARAM_URL
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_pascaprodi/syncapitimeout',
+        get_string('setting_syncapitimeout', 'local_pascaprodi'),
+        get_string('setting_syncapitimeout_desc', 'local_pascaprodi'),
+        30,
+        PARAM_INT
+    ));
+
     $ADMIN->add('localplugins', $settings);
 
     $ADMIN->add('localplugins', new admin_externalpage(
@@ -82,5 +104,12 @@ if ($hassiteconfig) {
         get_string('userrolepage', 'local_pascaprodi'),
         new moodle_url('/local/pascaprodi/user_role.php'),
         'moodle/role:assign'
+    ));
+
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_pascaprodi_synccategories',
+        get_string('synccategoriespage', 'local_pascaprodi'),
+        new moodle_url('/local/pascaprodi/sync_categories.php'),
+        'moodle/category:manage'
     ));
 }
