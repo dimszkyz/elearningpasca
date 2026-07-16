@@ -63,5 +63,9 @@ function xmldb_local_pascaprodi_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026071605, 'local', 'pascaprodi');
     }
 
+    if ($oldversion < 2026071606) {
+        upgrade_plugin_savepoint(true, 2026071606, 'local', 'pascaprodi');
+    }
+
     return true;
 }
