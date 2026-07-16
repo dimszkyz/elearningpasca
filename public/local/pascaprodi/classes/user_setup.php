@@ -8,8 +8,6 @@
 
 namespace local_pascaprodi;
 
-use stdClass;
-
 /**
  * Helper for applying Prodi role and cohort setup when a user is created.
  *
@@ -21,10 +19,10 @@ final class user_setup {
     /**
      * Apply role/category setup from the Add new user form.
      *
-     * Student-like users are added to the generated student cohort for the
-     * selected Prodi. Teacher/globalteacher/course creator/manager roles are
-     * assigned at the selected category context instead, so they do not become
-     * students through the student cohort sync.
+     * Every created user is added to the generated student cohort for each
+     * selected Prodi/category. Teacher/globalteacher/course creator/manager
+     * roles are also assigned at the selected category context so the user can
+     * keep lecturer permissions while still being grouped in the Prodi cohort.
      *
      * @param int $userid Moodle user ID.
      * @param int $roleid Selected Moodle role ID, or 0 for no role change.
@@ -61,11 +59,7 @@ final class user_setup {
                     role_assign($roleid, $userid, $categorycontext->id);
                 }
             }
-
-            return;
-        }
-
-        if ($role && !$categoryids && strtolower((string) $role->shortname) !== 'student') {
+        } else if ($role && !$categoryids && strtolower((string) $role->shortname) !== 'student') {
             require_capability('moodle/role:assign', $systemcontext);
 
             if (!$DB->record_exists('role_assignments', [
