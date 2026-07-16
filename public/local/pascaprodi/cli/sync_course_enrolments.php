@@ -7,7 +7,7 @@
 // (at your option) any later version.
 
 /**
- * Synchronise generated Prodi cohorts into existing courses by course category.
+ * Synchronise generated Prodi student cohorts into existing courses by course category.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -32,7 +32,7 @@ if ($unrecognized) {
 }
 
 if (!empty($options['help'])) {
-    cli_writeln('Synchronise generated Prodi cohorts into existing courses.');
+    cli_writeln('Synchronise generated Prodi student cohorts into existing courses.');
     cli_writeln('');
     cli_writeln('Options:');
     cli_writeln('  --categoryid=ID   Optional course category ID to limit the sync.');
@@ -54,21 +54,18 @@ $courses = $DB->get_records_select('course', $where, $params, 'category ASC, sho
 
 $total = 0;
 $student = 0;
-$teacher = 0;
 $skipped = 0;
 
 foreach ($courses as $course) {
     $result = \local_pascaprodi\manager::enrol_course_category_cohorts((int) $course->id);
     $total++;
     $student += (int) $result[\local_pascaprodi\manager::TYPE_STUDENT];
-    $teacher += (int) $result[\local_pascaprodi\manager::TYPE_TEACHER];
     $skipped += (int) $result['skipped'];
 
-    cli_writeln("Course {$course->id} ({$course->shortname}): student instances +{$result[\local_pascaprodi\manager::TYPE_STUDENT]}, teacher instances +{$result[\local_pascaprodi\manager::TYPE_TEACHER]}, skipped {$result['skipped']}");
+    cli_writeln("Course {$course->id} ({$course->shortname}): student instances +{$result[\local_pascaprodi\manager::TYPE_STUDENT]}, skipped {$result['skipped']}");
 }
 
 cli_writeln('Done.');
 cli_writeln("Courses checked: {$total}");
 cli_writeln("Student cohort sync instances created: {$student}");
-cli_writeln("Teacher cohort sync instances created: {$teacher}");
 cli_writeln("Skipped existing/missing instances: {$skipped}");
