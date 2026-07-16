@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/siakaddummy/db" VERSION="20260716" COMMENT="Dummy SIAKAD tables for Moodle integration"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_siad_user" COMMENT="Dummy SIAKAD user accounts">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sourceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User identifier from SIAKAD"/>
+        <FIELD NAME="moodleuserid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Linked Moodle user id"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="username" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="passwordhash" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Dummy source password hash"/>
+        <FIELD NAME="role" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="mahasiswa" SEQUENCE="false"/>
+        <FIELD NAME="active" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="sourceid_uniq" TYPE="unique" FIELDS="sourceid"/>
+        <KEY NAME="email_uniq" TYPE="unique" FIELDS="email"/>
+        <KEY NAME="username_uniq" TYPE="unique" FIELDS="username"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="moodleuserid_idx" UNIQUE="false" FIELDS="moodleuserid"/>
+        <INDEX NAME="role_active_idx" UNIQUE="false" FIELDS="role, active"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siad_prodi" COMMENT="Dummy SIAKAD study programmes">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="code" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="active" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="code_uniq" TYPE="unique" FIELDS="code"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="active_idx" UNIQUE="false" FIELDS="active"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siad_mahasiswa" COMMENT="Dummy SIAKAD student profiles">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="nim" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="prodiid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="cohortyear" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="2026" SEQUENCE="false"/>
+        <FIELD NAME="currentsemester" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="aktif" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="local_siad_user" REFFIELDS="id"/>
+        <KEY NAME="prodiid_fk" TYPE="foreign" FIELDS="prodiid" REFTABLE="local_siad_prodi" REFFIELDS="id"/>
+        <KEY NAME="userid_uniq" TYPE="unique" FIELDS="userid"/>
+        <KEY NAME="nim_uniq" TYPE="unique" FIELDS="nim"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="prodi_status_idx" UNIQUE="false" FIELDS="prodiid, status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siad_dosen" COMMENT="Dummy SIAKAD lecturer profiles">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="nidn" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="prodiid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="aktif" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="local_siad_user" REFFIELDS="id"/>
+        <KEY NAME="prodiid_fk" TYPE="foreign" FIELDS="prodiid" REFTABLE="local_siad_prodi" REFFIELDS="id"/>
+        <KEY NAME="userid_uniq" TYPE="unique" FIELDS="userid"/>
+        <KEY NAME="nidn_uniq" TYPE="unique" FIELDS="nidn"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="prodi_status_idx" UNIQUE="false" FIELDS="prodiid, status"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siad_tagihan" COMMENT="Dummy SIAKAD student billing records">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mahasiswaid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="invoice" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="type" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="academicyear" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="semester" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="amount" TYPE="int" LENGTH="18" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="belum_bayar" SEQUENCE="false"/>
+        <FIELD NAME="examrequirement" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="dueat" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="paidat" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mahasiswaid_fk" TYPE="foreign" FIELDS="mahasiswaid" REFTABLE="local_siad_mahasiswa" REFFIELDS="id"/>
+        <KEY NAME="invoice_uniq" TYPE="unique" FIELDS="invoice"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="examlookup_idx" UNIQUE="false" FIELDS="mahasiswaid, academicyear, semester, examrequirement"/>
+        <INDEX NAME="status_idx" UNIQUE="false" FIELDS="status"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
