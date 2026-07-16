@@ -79,7 +79,7 @@ if ($result !== null) {
             get_string('idnumbercoursecategory'),
             get_string('categoryid', 'local_pascaprodi'),
             get_string('cohortid', 'local_pascaprodi'),
-            get_string('message', 'core_message'),
+            get_string('syncmessage', 'local_pascaprodi'),
         ];
         $table->attributes['class'] = 'generaltable table table-striped';
 
