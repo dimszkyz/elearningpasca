@@ -160,7 +160,7 @@ class user_editadvanced_form extends moodleform {
             $mform->addElement('header', 'pascaprodiaccess', get_string('adduserprodiheading', 'local_pascaprodi'));
             $mform->addElement('static', 'pascaprodiaccessdesc', '', get_string('adduserprodiheading_desc', 'local_pascaprodi'));
 
-            $roleoptions = [0 => get_string('norolechange', 'local_pascaprodi')];
+            $roleoptions = [0 => get_string('chooseaccessrole', 'local_pascaprodi')];
             $roles = $DB->get_records('role', null, 'sortorder ASC', 'id,name,shortname,archetype');
             foreach ($roles as $role) {
                 $label = role_get_name($role, $systemcontext, ROLENAME_ORIGINAL) . ' (' . $role->shortname . ')';
@@ -171,6 +171,7 @@ class user_editadvanced_form extends moodleform {
             $mform->setType('pascaprodi_roleid', PARAM_INT);
             $mform->setDefault('pascaprodi_roleid', 0);
             $mform->addHelpButton('pascaprodi_roleid', 'field_accessrole', 'local_pascaprodi');
+            $mform->addRule('pascaprodi_roleid', get_string('error_accessrole_required', 'local_pascaprodi'), 'required', null, 'client');
 
             $categoryoptions = [];
             $categories = $DB->get_records('course_categories', null, 'sortorder ASC', 'id,name,path');
@@ -185,6 +186,7 @@ class user_editadvanced_form extends moodleform {
             ]);
             $mform->setType('pascaprodi_categoryids', PARAM_INT);
             $mform->addHelpButton('pascaprodi_categoryids', 'field_categories', 'local_pascaprodi');
+            $mform->addRule('pascaprodi_categoryids', get_string('error_categories_required', 'local_pascaprodi'), 'required', null, 'client');
         }
 
         if ($userid == -1) {
@@ -361,7 +363,12 @@ class user_editadvanced_form extends moodleform {
             $categoryids = \local_pascaprodi\user_setup::normalise_category_ids($usernew->pascaprodi_categoryids ?? []);
             $roleid = (int) ($usernew->pascaprodi_roleid ?? 0);
 
-            if (count($categoryids) > 1 && !\local_pascaprodi\user_setup::allows_multiple_categories($roleid)) {
+            if ($roleid <= 0) {
+                $err['pascaprodi_roleid'] = get_string('error_accessrole_required', 'local_pascaprodi');
+            }
+            if (!$categoryids) {
+                $err['pascaprodi_categoryids'] = get_string('error_categories_required', 'local_pascaprodi');
+            } else if (count($categoryids) > 1 && !\local_pascaprodi\user_setup::allows_multiple_categories($roleid)) {
                 $err['pascaprodi_categoryids'] = get_string('error_multiple_categories_teacher_role', 'local_pascaprodi');
             }
         }
