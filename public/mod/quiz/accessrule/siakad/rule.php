@@ -9,8 +9,6 @@
 use local_siakaddummy\service;
 use mod_quiz\local\access_rule_base;
 use mod_quiz\quiz_settings;
-use mod_quiz_mod_form;
-use MoodleQuickForm;
 
 /**
  * Restrict quiz attempts using SIAKAD programme and billing data.
