@@ -100,13 +100,6 @@ if ($hassiteconfig) {
     $ADMIN->add('localplugins', $settings);
 
     $ADMIN->add('localplugins', new admin_externalpage(
-        'local_pascaprodi_userrole',
-        get_string('userrolepage', 'local_pascaprodi'),
-        new moodle_url('/local/pascaprodi/user_role.php'),
-        'moodle/role:assign'
-    ));
-
-    $ADMIN->add('localplugins', new admin_externalpage(
         'local_pascaprodi_synccategories',
         get_string('synccategoriespage', 'local_pascaprodi'),
         new moodle_url('/local/pascaprodi/sync_categories.php'),
