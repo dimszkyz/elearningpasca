@@ -17,7 +17,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_pascaprodi';
-$plugin->version = 2026071604;
+$plugin->version = 2026071605;
 $plugin->requires = 2026042000;
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '1.3.0';
+$plugin->release = '1.4.0';
