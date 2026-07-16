@@ -17,29 +17,29 @@ namespace local_pascaprodi;
  */
 final class observer {
     /**
-     * Create generated cohorts when a course category is created.
+     * Create the generated student cohort when a course category is created.
      */
     public static function course_category_created(\core\event\course_category_created $event): void {
         if (!manager::is_enabled()) {
             return;
         }
 
-        manager::ensure_category_cohorts((int) $event->objectid);
+        manager::ensure_category_cohort((int) $event->objectid);
     }
 
     /**
-     * Keep generated cohort names aligned with the category name.
+     * Keep the generated student cohort name aligned with the category name.
      */
     public static function course_category_updated(\core\event\course_category_updated $event): void {
         if (!manager::is_enabled() || !manager::should_update_names()) {
             return;
         }
 
-        manager::ensure_category_cohorts((int) $event->objectid);
+        manager::ensure_category_cohort((int) $event->objectid);
     }
 
     /**
-     * Archive generated cohorts when their category is deleted.
+     * Archive the generated student cohort when its category is deleted.
      */
     public static function course_category_deleted(\core\event\course_category_deleted $event): void {
         if (!manager::is_enabled() || !manager::should_archive_deleted()) {
@@ -51,7 +51,7 @@ final class observer {
     }
 
     /**
-     * Attach the category's generated cohorts to a newly-created course.
+     * Attach the category's generated student cohort to a newly-created course.
      */
     public static function course_created(\core\event\course_created $event): void {
         if (!manager::is_enabled()) {
