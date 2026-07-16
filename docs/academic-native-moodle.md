@@ -14,7 +14,46 @@ Gunakan fitur bawaan Moodle terlebih dahulu:
 - **Group / Grouping** = pemisahan kelas atau Prodi di dalam satu Mata Kuliah bersama.
 - **Restrict access** = pembatasan aktivitas seperti Quiz/Ujian berdasarkan group/grouping bila diperlukan.
 
-Dengan model ini, Moodle tetap menjadi pusat pengelolaan Course, Category, Role, Cohort, dan Quiz. Plugin baru hanya dibuat nanti untuk kebutuhan yang tidak tersedia di Moodle, seperti sinkronisasi data kampus atau pengecekan tagihan sebelum ujian.
+Dengan model ini, Moodle tetap menjadi pusat pengelolaan Course, Category, Role, Cohort, dan Quiz. Plugin custom dibuat kecil sebagai pendamping otomasi, bukan pengganti fitur akademik bawaan Moodle.
+
+## Plugin kecil: Otomasi Prodi Pascasarjana
+
+Plugin `local_pascaprodi` hanya bertugas mengurangi pekerjaan manual saat admin membuat kategori Prodi.
+
+Saat kategori Course dibuat:
+
+```text
+Category: Magister Manajemen
+```
+
+plugin otomatis membuat cohort:
+
+```text
+Mahasiswa - Magister Manajemen
+```
+
+Cohort diberi idnumber stabil berbasis ID kategori:
+
+```text
+pasca:prodi-category:{categoryid}
+```
+
+Perilaku plugin:
+
+- Membuat cohort otomatis saat Course Category dibuat.
+- Mengubah nama cohort otomatis saat nama Course Category diubah.
+- Saat Category dihapus, cohort tidak ikut dihapus. Cohort hanya disembunyikan dan diberi awalan arsip agar anggota cohort tetap aman.
+- Untuk kategori yang sudah ada sebelum plugin dipasang, jalankan CLI backfill:
+
+```powershell
+php local/pascaprodi/cli/sync_categories.php
+```
+
+Pengaturan plugin ada di:
+
+```text
+Site administration → Plugins → Local plugins → Pasca Study Program automation
+```
 
 ## Struktur kategori Prodi
 
@@ -53,12 +92,14 @@ Magister Sistem Informasi
 
 ## Struktur cohort mahasiswa
 
-Buat cohort untuk setiap Prodi:
+Setiap Prodi memiliki cohort mahasiswa. Dengan `local_pascaprodi`, cohort dibuat otomatis dari kategori Prodi.
+
+Contoh:
 
 ```text
-Mahasiswa Magister Manajemen
-Mahasiswa Magister Hukum
-Mahasiswa Magister Sistem Informasi
+Mahasiswa - Magister Manajemen
+Mahasiswa - Magister Hukum
+Mahasiswa - Magister Sistem Informasi
 ```
 
 Menu Moodle:
@@ -84,7 +125,7 @@ Contoh:
 ```text
 Course: Manajemen Strategis
 Category: Magister Manajemen
-Cohort sync: Mahasiswa Magister Manajemen
+Cohort sync: Mahasiswa - Magister Manajemen
 ```
 
 Hasilnya, hanya mahasiswa yang menjadi anggota cohort Magister Manajemen yang otomatis terdaftar ke Mata Kuliah tersebut.
@@ -142,7 +183,7 @@ Restrict access: hanya Group MM
 
 ## Integrasi masa depan
 
-Plugin custom hanya dibuat untuk kebutuhan yang tidak bisa ditangani fitur bawaan Moodle, misalnya:
+Plugin custom berikutnya hanya dibuat untuk kebutuhan yang tidak bisa ditangani fitur bawaan Moodle, misalnya:
 
 1. Sinkronisasi mahasiswa dari sistem kampus ke Moodle user + cohort Prodi.
 2. Sinkronisasi dosen dari sistem kampus ke role Course creator / Manager pada kategori Prodi.
@@ -155,7 +196,8 @@ Plugin custom hanya dibuat untuk kebutuhan yang tidak bisa ditangani fitur bawaa
 Prioritas pengembangan berikutnya:
 
 1. Rapikan struktur kategori Prodi di Moodle.
-2. Rapikan cohort per Prodi.
-3. Buat SOP pemberian role Dosen pada kategori Prodi.
-4. Buat SOP pembuatan Course dan Cohort sync.
-5. Setelah alur native stabil, baru bangun plugin kecil untuk sinkronisasi dan payment gate.
+2. Gunakan `local_pascaprodi` agar cohort Prodi dibuat otomatis dari kategori.
+3. Rapikan SOP memasukkan mahasiswa ke cohort Prodi.
+4. Buat SOP pemberian role Dosen pada kategori Prodi.
+5. Buat SOP pembuatan Course dan Cohort sync.
+6. Setelah alur native stabil, baru bangun plugin kecil berikutnya untuk sinkronisasi dan payment gate.
