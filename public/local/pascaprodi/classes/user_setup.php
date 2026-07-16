@@ -51,10 +51,7 @@ final class user_setup {
             foreach ($categoryids as $categoryid) {
                 \core_course_category::get($categoryid, MUST_EXIST, true);
                 $categorycontext = \context_coursecat::instance($categoryid);
-
-                if (!user_can_assign($categorycontext, $roleid)) {
-                    throw new \required_capability_exception($categorycontext, 'moodle/role:assign', 'nopermissions', 'error');
-                }
+                require_capability('moodle/role:assign', $categorycontext);
 
                 if (!$DB->record_exists('role_assignments', [
                     'roleid' => $roleid,
@@ -69,9 +66,7 @@ final class user_setup {
         }
 
         if ($role && !$categoryids && strtolower((string) $role->shortname) !== 'student') {
-            if (!user_can_assign($systemcontext, $roleid)) {
-                throw new \required_capability_exception($systemcontext, 'moodle/role:assign', 'nopermissions', 'error');
-            }
+            require_capability('moodle/role:assign', $systemcontext);
 
             if (!$DB->record_exists('role_assignments', [
                 'roleid' => $roleid,
