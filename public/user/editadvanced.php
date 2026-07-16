@@ -186,6 +186,15 @@ if ($userform->is_cancelled()) {
 
     $usernew->timemodified = time();
     $createpassword = false;
+    $pascaprodidata = null;
+
+    if ((int) $usernew->id === -1 && class_exists('\\local_pascaprodi\\user_setup')) {
+        $pascaprodidata = [
+            'roleid' => (int) ($usernew->pascaprodi_roleid ?? 0),
+            'categoryids' => \local_pascaprodi\user_setup::normalise_category_ids($usernew->pascaprodi_categoryids ?? []),
+        ];
+    }
+    unset($usernew->pascaprodi_roleid, $usernew->pascaprodi_categoryids);
 
     if ($usernew->id == -1) {
         unset($usernew->id);
@@ -205,6 +214,14 @@ if ($userform->is_cancelled()) {
             $usernew->password = AUTH_PASSWORD_NOT_CACHED;
         }
         $usernew->id = user_create_user($usernew, false, false);
+
+        if ($pascaprodidata !== null) {
+            \local_pascaprodi\user_setup::apply(
+                (int) $usernew->id,
+                (int) $pascaprodidata['roleid'],
+                (array) $pascaprodidata['categoryids']
+            );
+        }
 
         if (!$authplugin->is_internal() and $authplugin->can_change_password() and !empty($usernew->newpassword)) {
             if (!$authplugin->user_update_password($usernew, $usernew->newpassword)) {
