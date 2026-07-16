@@ -82,7 +82,10 @@ final class manager {
             $cohort->description = $description;
             $cohort->descriptionformat = FORMAT_HTML;
             $cohort->visible = 1;
-            $cohort->component = self::COMPONENT;
+            // Keep generated cohorts manually manageable in Moodle's Cohorts UI.
+            // A non-empty component makes Moodle treat the cohort as plugin-owned,
+            // which hides actions such as Assign members from administrators.
+            $cohort->component = '';
             $cohort->timemodified = $now;
             cohort_update_cohort($cohort);
             return (int) $cohort->id;
@@ -95,7 +98,8 @@ final class manager {
             'description' => $description,
             'descriptionformat' => FORMAT_HTML,
             'visible' => 1,
-            'component' => self::COMPONENT,
+            // Empty component keeps the cohort editable/assignable from Moodle UI.
+            'component' => '',
         ];
 
         return (int) cohort_add_cohort($cohort);
@@ -121,6 +125,7 @@ final class manager {
         $basename = $categoryname !== '' ? $categoryname : preg_replace('/^' . preg_quote(self::cohort_name_prefix(), '/') . '/', '', $cohort->name);
         $cohort->name = self::archive_prefix() . self::cohort_name((string) $basename);
         $cohort->visible = 0;
+        $cohort->component = '';
         $cohort->description = get_string('cohortarchiveddescription', self::COMPONENT, (object) [
             'categoryid' => $categoryid,
             'categoryname' => $categoryname !== '' ? $categoryname : $cohort->name,
