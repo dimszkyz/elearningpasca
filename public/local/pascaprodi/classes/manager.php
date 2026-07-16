@@ -59,6 +59,40 @@ final class manager {
     }
 
     /**
+     * Determine whether a role should be assigned at Prodi/category context.
+     *
+     * Student-like roles are handled through the generated student cohort instead.
+     * Teacher, lecturer, course creator, manager, and custom globalteacher roles can
+     * be assigned to one or more selected Prodi categories.
+     */
+    public static function is_category_role(stdClass $role): bool {
+        $shortname = strtolower((string) ($role->shortname ?? ''));
+        $name = strtolower((string) ($role->name ?? ''));
+        $archetype = strtolower((string) ($role->archetype ?? ''));
+        $text = $shortname . ' ' . $name . ' ' . $archetype;
+
+        $keywords = [
+            'teacher',
+            'globalteacher',
+            'grandteacher',
+            'editingteacher',
+            'lecturer',
+            'dosen',
+            'coursecreator',
+            'creator',
+            'manager',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if (strpos($text, $keyword) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Build the stable generated student cohort idnumber for a category.
      */
     public static function cohort_idnumber(int $categoryid): string {
