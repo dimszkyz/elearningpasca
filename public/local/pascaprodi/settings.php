@@ -40,14 +40,6 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
-    $settings->add(new admin_setting_configtext(
-        'local_pascaprodi/teachernameprefix',
-        get_string('setting_teachernameprefix', 'local_pascaprodi'),
-        get_string('setting_teachernameprefix_desc', 'local_pascaprodi'),
-        get_string('defaultteachernameprefix', 'local_pascaprodi'),
-        PARAM_TEXT
-    ));
-
     $settings->add(new admin_setting_configcheckbox(
         'local_pascaprodi/updatenames',
         get_string('setting_updatenames', 'local_pascaprodi'),
@@ -83,12 +75,12 @@ if ($hassiteconfig) {
         1
     ));
 
-    $settings->add(new admin_setting_configcheckbox(
-        'local_pascaprodi/autoenrolteachers',
-        get_string('setting_autoenrolteachers', 'local_pascaprodi'),
-        get_string('setting_autoenrolteachers_desc', 'local_pascaprodi'),
-        1
-    ));
-
     $ADMIN->add('localplugins', $settings);
+
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_pascaprodi_userrole',
+        get_string('userrolepage', 'local_pascaprodi'),
+        new moodle_url('/local/pascaprodi/user_role.php'),
+        'moodle/role:assign'
+    ));
 }
