@@ -8,8 +8,9 @@ Gunakan fitur bawaan Moodle terlebih dahulu:
 
 - **Course Category** = Program Studi / Prodi.
 - **Course** = Mata Kuliah.
-- **Cohort** = daftar mahasiswa per Prodi.
-- **Cohort sync enrolment** = otomatis mendaftarkan mahasiswa Prodi ke Mata Kuliah.
+- **Cohort Mahasiswa** = daftar mahasiswa per Prodi.
+- **Cohort Dosen** = daftar dosen per Prodi.
+- **Cohort sync enrolment** = otomatis mendaftarkan mahasiswa/dosen Prodi ke Mata Kuliah.
 - **Course creator** atau **Manager pada kategori** = hak Dosen untuk membuat Mata Kuliah di Prodi tertentu.
 - **Group / Grouping** = pemisahan kelas atau Prodi di dalam satu Mata Kuliah bersama.
 - **Restrict access** = pembatasan aktivitas seperti Quiz/Ujian berdasarkan group/grouping bila diperlukan.
@@ -18,7 +19,7 @@ Dengan model ini, Moodle tetap menjadi pusat pengelolaan Course, Category, Role,
 
 ## Plugin kecil: Otomasi Prodi Pascasarjana
 
-Plugin `local_pascaprodi` hanya bertugas mengurangi pekerjaan manual saat admin membuat kategori Prodi.
+Plugin `local_pascaprodi` mengurangi pekerjaan manual saat admin membuat kategori Prodi dan Mata Kuliah.
 
 Saat kategori Course dibuat:
 
@@ -26,27 +27,36 @@ Saat kategori Course dibuat:
 Category: Magister Manajemen
 ```
 
-plugin otomatis membuat cohort:
+plugin otomatis membuat dua cohort:
 
 ```text
 Mahasiswa - Magister Manajemen
+Dosen - Magister Manajemen
 ```
 
 Cohort diberi idnumber stabil berbasis ID kategori:
 
 ```text
 pasca:prodi-category:{categoryid}
+pasca:prodi-category-teacher:{categoryid}
 ```
 
 Perilaku plugin:
 
-- Membuat cohort otomatis saat Course Category dibuat.
+- Membuat cohort mahasiswa dan cohort dosen otomatis saat Course Category dibuat.
 - Mengubah nama cohort otomatis saat nama Course Category diubah.
 - Saat Category dihapus, cohort tidak ikut dihapus. Cohort hanya disembunyikan dan diberi awalan arsip agar anggota cohort tetap aman.
+- Saat Course/Mata Kuliah baru dibuat di dalam kategori Prodi, plugin otomatis menambahkan Cohort sync untuk mahasiswa dan dosen kategori tersebut.
 - Untuk kategori yang sudah ada sebelum plugin dipasang, jalankan CLI backfill:
 
 ```powershell
 php local/pascaprodi/cli/sync_categories.php
+```
+
+- Untuk Course yang sudah ada sebelum fitur auto-enrol aktif, jalankan:
+
+```powershell
+php local/pascaprodi/cli/sync_course_enrolments.php
 ```
 
 Pengaturan plugin ada di:
@@ -90,16 +100,17 @@ Magister Sistem Informasi
 └── Tata Kelola TI
 ```
 
-## Struktur cohort mahasiswa
+## Struktur cohort mahasiswa dan dosen
 
-Setiap Prodi memiliki cohort mahasiswa. Dengan `local_pascaprodi`, cohort dibuat otomatis dari kategori Prodi.
+Setiap Prodi memiliki dua cohort otomatis dari `local_pascaprodi`.
 
 Contoh:
 
 ```text
 Mahasiswa - Magister Manajemen
+Dosen - Magister Manajemen
 Mahasiswa - Magister Hukum
-Mahasiswa - Magister Sistem Informasi
+Dosen - Magister Hukum
 ```
 
 Menu Moodle:
@@ -108,27 +119,30 @@ Menu Moodle:
 Site administration → Users → Accounts → Cohorts
 ```
 
-Mahasiswa hanya dimasukkan ke cohort sesuai Prodi aktifnya.
+Mahasiswa dimasukkan ke cohort mahasiswa sesuai Prodi aktifnya. Dosen dimasukkan ke cohort dosen sesuai Prodi tempat ia mengajar.
 
-## Enrolment Mata Kuliah
+## Enrolment Mata Kuliah otomatis
 
-Setiap Mata Kuliah menggunakan enrolment method **Cohort sync** sesuai Prodi.
-
-Menu di dalam Course:
-
-```text
-Course → Participants → Enrolment methods → Add method → Cohort sync
-```
+Saat Mata Kuliah dibuat di kategori Prodi, plugin otomatis menambahkan enrolment method **Cohort sync** sesuai kategori.
 
 Contoh:
 
 ```text
 Course: Manajemen Strategis
 Category: Magister Manajemen
-Cohort sync: Mahasiswa - Magister Manajemen
+
+Auto Cohort sync:
+- Mahasiswa - Magister Manajemen → role Student
+- Dosen - Magister Manajemen → role Teacher
 ```
 
-Hasilnya, hanya mahasiswa yang menjadi anggota cohort Magister Manajemen yang otomatis terdaftar ke Mata Kuliah tersebut.
+Hasilnya:
+
+```text
+Mahasiswa yang ada di cohort Mahasiswa - Magister Manajemen otomatis menjadi Student di course.
+Dosen yang ada di cohort Dosen - Magister Manajemen otomatis menjadi Teacher di course.
+Mahasiswa/Dosen dari Prodi lain tidak otomatis masuk.
+```
 
 ## Akses Dosen membuat Mata Kuliah
 
@@ -155,6 +169,27 @@ Kaprodi MM → Manager pada kategori Magister Manajemen
 ```
 
 Dengan cara ini, Dosen tidak perlu diberi akses global sebagai site administrator.
+
+## Course untuk beberapa Prodi
+
+Moodle bawaan hanya menempatkan satu Course pada satu kategori utama. Jadi Course tetap punya satu kategori utama, misalnya:
+
+```text
+Course: Metodologi Penelitian
+Primary category: Magister Manajemen
+```
+
+Jika Course harus dipakai beberapa Prodi, tambahkan Cohort sync tambahan untuk Prodi lain:
+
+```text
+Cohort sync tambahan:
+- Mahasiswa - Magister Hukum → Student
+- Dosen - Magister Hukum → Teacher
+- Mahasiswa - Magister Sistem Informasi → Student
+- Dosen - Magister Sistem Informasi → Teacher
+```
+
+Pengembangan berikutnya bisa berupa halaman kecil “Buat Mata Kuliah Bersama” untuk memilih beberapa Prodi sebelum Course dibuat, lalu plugin menambahkan semua Cohort sync secara otomatis.
 
 ## Ujian per Prodi
 
@@ -186,7 +221,7 @@ Restrict access: hanya Group MM
 Plugin custom berikutnya hanya dibuat untuk kebutuhan yang tidak bisa ditangani fitur bawaan Moodle, misalnya:
 
 1. Sinkronisasi mahasiswa dari sistem kampus ke Moodle user + cohort Prodi.
-2. Sinkronisasi dosen dari sistem kampus ke role Course creator / Manager pada kategori Prodi.
+2. Sinkronisasi dosen dari sistem kampus ke cohort dosen + role Course creator / Manager pada kategori Prodi.
 3. Sinkronisasi status tagihan/SPP/UKT.
 4. Pembatasan ikut Quiz/Ujian berdasarkan status pembayaran.
 5. Dashboard laporan akademik khusus Pascasarjana.
@@ -196,8 +231,8 @@ Plugin custom berikutnya hanya dibuat untuk kebutuhan yang tidak bisa ditangani 
 Prioritas pengembangan berikutnya:
 
 1. Rapikan struktur kategori Prodi di Moodle.
-2. Gunakan `local_pascaprodi` agar cohort Prodi dibuat otomatis dari kategori.
-3. Rapikan SOP memasukkan mahasiswa ke cohort Prodi.
+2. Gunakan `local_pascaprodi` agar cohort mahasiswa dan dosen dibuat otomatis dari kategori.
+3. Rapikan SOP memasukkan mahasiswa/dosen ke cohort Prodi.
 4. Buat SOP pemberian role Dosen pada kategori Prodi.
-5. Buat SOP pembuatan Course dan Cohort sync.
+5. Buat SOP pembuatan Course bersama lintas Prodi.
 6. Setelah alur native stabil, baru bangun plugin kecil berikutnya untuk sinkronisasi dan payment gate.
