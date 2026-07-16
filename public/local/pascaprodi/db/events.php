@@ -29,4 +29,8 @@ $observers = [
         'eventname' => '\\core\\event\\course_category_deleted',
         'callback' => '\\local_pascaprodi\\observer::course_category_deleted',
     ],
+    [
+        'eventname' => '\\core\\event\\course_created',
+        'callback' => '\\local_pascaprodi\\observer::course_created',
+    ],
 ];
