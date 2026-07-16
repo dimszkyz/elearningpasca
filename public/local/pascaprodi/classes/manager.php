@@ -30,6 +30,12 @@ final class manager {
     /** Old teacher cohort prefix from version 1.1.0. Kept only for cleanup. */
     private const OLD_TEACHER_IDNUMBER_PREFIX = 'pasca:prodi-category-teacher:';
 
+    /** Default API URL for UNW study programs. */
+    public const DEFAULT_API_URL = 'https://panel-web.unw.ac.id/api/unw-program-studi';
+
+    /** Only this jenjang is synced into Moodle course categories. */
+    private const SYNC_JENJANG = 'magister';
+
     /**
      * Check whether automation is enabled.
      */
@@ -56,6 +62,23 @@ final class manager {
      */
     public static function should_autoenrol_students(): bool {
         return (bool) get_config(self::COMPONENT, 'autoenrolstudents');
+    }
+
+    /**
+     * Return configured API URL for category sync.
+     */
+    public static function get_sync_api_url(): string {
+        $url = get_config(self::COMPONENT, 'syncapiurl');
+        $url = $url === false ? self::DEFAULT_API_URL : trim((string) $url);
+        return $url !== '' ? $url : self::DEFAULT_API_URL;
+    }
+
+    /**
+     * Return API timeout in seconds.
+     */
+    public static function get_sync_api_timeout(): int {
+        $timeout = (int) get_config(self::COMPONENT, 'syncapitimeout');
+        return $timeout > 0 ? $timeout : 30;
     }
 
     /**
@@ -222,6 +245,189 @@ final class manager {
         }
 
         return $result;
+    }
+
+    /**
+     * Fetch UNW Program Studi API and sync Magister records as root Moodle categories.
+     *
+     * @return array{created:int,updated:int,unchanged:int,skipped:int,failed:int,cohortcreated:int,cohortupdated:int,items:array<int,array<string,string|int>>}
+     */
+    public static function sync_remote_magister_categories(): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/filelib.php');
+
+        $result = [
+            'created' => 0,
+            'updated' => 0,
+            'unchanged' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'cohortcreated' => 0,
+            'cohortupdated' => 0,
+            'items' => [],
+        ];
+
+        $payload = self::fetch_remote_program_studi_payload();
+        $items = $payload->data ?? [];
+        if (!is_array($items)) {
+            throw new \moodle_exception('apisyncinvaliddata', self::COMPONENT);
+        }
+
+        foreach ($items as $item) {
+            $normalised = self::normalise_program_studi_item($item);
+            if (!$normalised) {
+                $result['skipped']++;
+                continue;
+            }
+
+            try {
+                $synced = self::sync_one_magister_category($normalised['name'], $normalised['idnumber']);
+                $result[$synced['status']]++;
+                if (!empty($synced['cohortcreated'])) {
+                    $result['cohortcreated']++;
+                } else if (!empty($synced['cohortid'])) {
+                    $result['cohortupdated']++;
+                }
+                $result['items'][] = [
+                    'status' => $synced['status'],
+                    'name' => $normalised['name'],
+                    'idnumber' => $normalised['idnumber'],
+                    'categoryid' => $synced['categoryid'],
+                    'cohortid' => $synced['cohortid'],
+                ];
+            } catch (\Throwable $exception) {
+                $result['failed']++;
+                $result['items'][] = [
+                    'status' => 'failed',
+                    'name' => $normalised['name'],
+                    'idnumber' => $normalised['idnumber'],
+                    'categoryid' => 0,
+                    'cohortid' => 0,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fetch and decode API payload.
+     */
+    private static function fetch_remote_program_studi_payload(): stdClass {
+        $url = self::get_sync_api_url();
+        $timeout = self::get_sync_api_timeout();
+        $response = download_file_content($url, null, null, false, $timeout, 20);
+
+        if ($response === false || trim((string) $response) === '') {
+            throw new \moodle_exception('apisyncfailed', self::COMPONENT, '', $url);
+        }
+
+        $payload = json_decode((string) $response);
+        if (!is_object($payload) || json_last_error() !== JSON_ERROR_NONE) {
+            throw new \moodle_exception('apisyncinvalidjson', self::COMPONENT, '', json_last_error_msg());
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Normalise one API item. Only Magister records are returned.
+     *
+     * @param mixed $item
+     * @return array{name:string,idnumber:string}|null
+     */
+    private static function normalise_program_studi_item($item): ?array {
+        if (!is_object($item)) {
+            return null;
+        }
+
+        $jenjang = trim((string) ($item->jenjang ?? ''));
+        if (strtolower($jenjang) !== self::SYNC_JENJANG) {
+            return null;
+        }
+
+        $nama = trim((string) ($item->nama ?? ''));
+        $slug = trim((string) ($item->slug ?? ''));
+        if ($nama === '' || $slug === '') {
+            return null;
+        }
+
+        $categoryname = trim($jenjang . ' ' . $nama);
+        $idnumber = clean_param($slug, PARAM_TEXT);
+
+        if (\core_text::strlen($categoryname) > 255) {
+            $categoryname = \core_text::substr($categoryname, 0, 255);
+        }
+        if (\core_text::strlen($idnumber) > 100) {
+            $idnumber = \core_text::substr($idnumber, 0, 100);
+        }
+
+        if ($categoryname === '' || $idnumber === '') {
+            return null;
+        }
+
+        return [
+            'name' => $categoryname,
+            'idnumber' => $idnumber,
+        ];
+    }
+
+    /**
+     * Create or update one root category from the remote API.
+     *
+     * @return array{status:string,categoryid:int,cohortid:int,cohortcreated:bool}
+     */
+    private static function sync_one_magister_category(string $name, string $idnumber): array {
+        global $DB;
+
+        $status = 'unchanged';
+        $existing = $DB->get_records('course_categories', ['idnumber' => $idnumber], 'id ASC', '*', 0, 1);
+        $record = $existing ? reset($existing) : false;
+
+        if ($record) {
+            $category = \core_course_category::get((int) $record->id, MUST_EXIST, true);
+            $changes = [];
+            if ((string) $record->name !== $name) {
+                $changes['name'] = $name;
+            }
+            if ((string) $record->idnumber !== $idnumber) {
+                $changes['idnumber'] = $idnumber;
+            }
+            if ((int) $record->parent !== 0) {
+                $changes['parent'] = 0;
+            }
+
+            if ($changes) {
+                $category->update((object) $changes);
+                $status = 'updated';
+            }
+            $categoryid = (int) $category->id;
+        } else {
+            $category = \core_course_category::create((object) [
+                'name' => $name,
+                'idnumber' => $idnumber,
+                'parent' => 0,
+                'description' => '',
+                'descriptionformat' => FORMAT_HTML,
+                'visible' => 1,
+            ]);
+            $categoryid = (int) $category->id;
+            $status = 'created';
+        }
+
+        $cohortidnumber = self::cohort_idnumber($categoryid);
+        $cohortexisted = $DB->record_exists('cohort', ['idnumber' => $cohortidnumber]);
+        $cohortid = self::ensure_category_cohort($categoryid);
+
+        return [
+            'status' => $status,
+            'categoryid' => $categoryid,
+            'cohortid' => (int) $cohortid,
+            'cohortcreated' => !$cohortexisted && !empty($cohortid),
+        ];
     }
 
     /**
