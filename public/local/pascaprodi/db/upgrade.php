@@ -52,5 +52,16 @@ function xmldb_local_pascaprodi_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026071603, 'local', 'pascaprodi');
     }
 
+    if ($oldversion < 2026071605) {
+        if (get_config('local_pascaprodi', 'syncapiurl') === false) {
+            set_config('syncapiurl', \local_pascaprodi\manager::DEFAULT_API_URL, 'local_pascaprodi');
+        }
+        if (get_config('local_pascaprodi', 'syncapitimeout') === false) {
+            set_config('syncapitimeout', 30, 'local_pascaprodi');
+        }
+
+        upgrade_plugin_savepoint(true, 2026071605, 'local', 'pascaprodi');
+    }
+
     return true;
 }
