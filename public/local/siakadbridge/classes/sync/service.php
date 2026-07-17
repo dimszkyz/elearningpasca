@@ -7,30 +7,56 @@ defined('MOODLE_INTERNAL') || die();
 
 use local_siakadbridge\manager;
 
-/** Imports the documented SIAKAD REST payload into Moodle-local bridge tables. */
+/**
+ * Imports a documented SIAKAD REST payload into Moodle-local bridge tables.
+ */
 final class service {
+    /**
+     * Synchronise using the configured source.
+     */
     public static function run(): object {
-        if ((string) get_config('local_siakadbridge', 'sourcemode') !== 'rest') {
+        $mode = (string) get_config('local_siakadbridge', 'sourcemode');
+        if ($mode !== 'rest') {
             return self::result(0, 0, 0, 'Manual mode: no remote synchronisation was performed.');
         }
+
         $url = trim((string) get_config('local_siakadbridge', 'apiurl'));
         if ($url === '') {
             throw new \moodle_exception('syncfailed', 'local_siakadbridge', '', 'SIAKAD API URL is empty.');
         }
-        return self::import_payload(self::fetch_payload($url), 'rest');
+
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_siakadbridge');
+        $lock = $lockfactory->get_lock('sync', 0);
+        if (!$lock) {
+            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '',
+                'Another SIAKAD synchronisation is already running.');
+        }
+
+        try {
+            $payload = self::fetch_payload($url);
+            return self::import_payload($payload, 'rest');
+        } finally {
+            $lock->release();
+        }
     }
 
+    /**
+     * Import a decoded payload. Public for CLI/tests and future adapters.
+     */
     public static function import_payload(object $payload, string $source = 'manual'): object {
         global $DB;
+
         $data = isset($payload->data) && is_object($payload->data) ? $payload->data : $payload;
         $transaction = $DB->start_delegated_transaction();
         $result = self::result();
+
         try {
             $prodis = self::items($data, 'prodi');
             $users = self::items($data, 'users');
             $students = self::items($data, 'mahasiswa');
             $lecturers = self::items($data, 'dosen');
             $bills = self::items($data, 'tagihan');
+
             foreach ($prodis as $item) {
                 self::upsert_prodi($item, $result);
             }
@@ -71,12 +97,14 @@ final class service {
             self::write_log($source, 'failed', $result);
             throw $exception;
         }
+
         self::write_log($source, 'success', $result);
         return $result;
     }
 
     private static function fetch_payload(string $url): object {
         global $CFG;
+
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $headers = ['Accept: application/json'];
@@ -85,7 +113,9 @@ final class service {
             $headers[] = 'Authorization: Bearer ' . $token;
         }
         $curl->setHeader($headers);
-        $timeout = max(1, (int) get_config('local_siakadbridge', 'apitimeout'));
+
+        $timeout = (int) get_config('local_siakadbridge', 'apitimeout');
+        $timeout = $timeout > 0 ? $timeout : 30;
         $response = $curl->get($url, [], [
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
@@ -93,13 +123,22 @@ final class service {
         $info = $curl->get_info();
         $status = (int) ($info['http_code'] ?? 0);
         if ($response === false || $status < 200 || $status >= 300) {
-            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '',
-                'HTTP ' . $status . ' while requesting SIAKAD API.');
+            throw new \moodle_exception(
+                'syncfailed',
+                'local_siakadbridge',
+                '',
+                'HTTP ' . $status . ' while requesting SIAKAD API.'
+            );
         }
+
         $payload = json_decode((string) $response);
         if (!is_object($payload) || json_last_error() !== JSON_ERROR_NONE) {
-            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '',
-                'Invalid JSON: ' . json_last_error_msg());
+            throw new \moodle_exception(
+                'syncfailed',
+                'local_siakadbridge',
+                '',
+                'Invalid JSON: ' . json_last_error_msg()
+            );
         }
         return $payload;
     }
@@ -113,47 +152,79 @@ final class service {
         return array_values(array_filter($items, 'is_object'));
     }
 
+    /**
+     * Mark records absent from an explicitly declared full snapshot as inactive/cancelled.
+     *
+     * @param array<int, object> $prodis
+     * @param array<int, object> $students
+     * @param array<int, object> $lecturers
+     * @param array<int, object> $bills
+     */
     private static function deactivate_missing(array $prodis, array $students, array $lecturers, array $bills): void {
-        self::update_missing('local_siakad_prodi', 'kode',
+        self::update_missing(
+            'local_siakad_prodi',
+            'kode',
             array_map(static fn(object $item): string => \core_text::strtoupper(trim((string) ($item->kode ?? ''))), $prodis),
-            ['aktif' => 0, 'timemodified' => time()], 'prodi');
-        self::update_missing('local_siakad_mahasiswa', 'nim',
+            ['aktif' => 0, 'timemodified' => time()],
+            'prodi'
+        );
+        self::update_missing(
+            'local_siakad_mahasiswa',
+            'nim',
             array_map(static fn(object $item): string => trim((string) ($item->nim ?? '')), $students),
-            ['status' => 'nonaktif', 'timemodified' => time()], 'student');
-        self::update_missing('local_siakad_dosen', 'nidn',
+            ['status' => 'nonaktif', 'timemodified' => time()],
+            'student'
+        );
+        self::update_missing(
+            'local_siakad_dosen',
+            'nidn',
             array_map(static fn(object $item): string => trim((string) ($item->nidn ?? '')), $lecturers),
-            ['status' => 'nonaktif', 'timemodified' => time()], 'lecturer');
-        self::update_missing('local_siakad_tagihan', 'kodetagihan',
+            ['status' => 'nonaktif', 'timemodified' => time()],
+            'lecturer'
+        );
+        self::update_missing(
+            'local_siakad_tagihan',
+            'kodetagihan',
             array_map(static fn(object $item): string => trim((string) ($item->kodetagihan ?? '')), $bills),
-            ['status' => manager::STATUS_DIBATALKAN, 'wajib' => 0, 'timemodified' => time()], 'bill');
+            ['status' => manager::STATUS_DIBATALKAN, 'wajib' => 0, 'timemodified' => time()],
+            'bill'
+        );
     }
 
-    private static function update_missing(string $table, string $field, array $values, array $updates, string $prefix): void {
+    private static function update_missing(
+        string $table,
+        string $identityfield,
+        array $values,
+        array $updates,
+        string $prefix
+    ): void {
         global $DB;
+
         $values = array_values(array_unique(array_filter($values, static fn(string $value): bool => $value !== '')));
         $select = '1 = 1';
         $params = [];
         if ($values) {
-            [$insql, $params] = $DB->get_in_or_equal($values, SQL_PARAMS_NAMED, $prefix, false);
-            $select = $field . ' ' . $insql;
+            [$insql, $inparams] = $DB->get_in_or_equal($values, SQL_PARAMS_NAMED, $prefix, false);
+            $select = $identityfield . ' ' . $insql;
+            $params = $inparams;
         }
-        foreach ($updates as $updatefield => $value) {
-            $DB->set_field_select($table, $updatefield, $value, $select, $params);
+        foreach ($updates as $field => $value) {
+            $DB->set_field_select($table, $field, $value, $select, $params);
         }
     }
 
     private static function upsert_prodi(object $item, object $result): void {
-        $code = \core_text::strtoupper(self::required_text($item, 'kode'));
+        $kode = \core_text::strtoupper(self::required_text($item, 'kode'));
         $sourceid = self::optional_text($item, 'id');
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
-            'kode' => $code,
+            'kode' => $kode,
             'nama' => self::required_text($item, 'nama'),
             'aktif' => isset($item->aktif) ? (int) (bool) $item->aktif : 1,
             'categoryid' => isset($item->categoryid) ? max(0, (int) $item->categoryid) : 0,
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_prodi', self::identity($sourceid, 'kode', $code), $record, $result);
+        self::upsert('local_siakad_prodi', self::identity('sourceid', $sourceid, 'kode', $kode), $record, $result);
     }
 
     private static function upsert_user(object $item, object $result): void {
@@ -168,11 +239,12 @@ final class service {
             'moodleuserid' => isset($item->moodleuserid) ? max(0, (int) $item->moodleuserid) : 0,
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_user', self::identity($sourceid, 'username', $username), $record, $result);
+        self::upsert('local_siakad_user', self::identity('sourceid', $sourceid, 'username', $username), $record, $result);
     }
 
     private static function upsert_mahasiswa(object $item, object $result): void {
         global $DB;
+
         $nim = self::required_text($item, 'nim');
         $username = \core_text::strtolower(self::required_text($item, 'username'));
         $prodicode = \core_text::strtoupper(self::required_text($item, 'prodi'));
@@ -190,11 +262,12 @@ final class service {
             'status' => \core_text::strtolower(self::optional_text($item, 'status', manager::STATUS_AKTIF)),
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_mahasiswa', self::identity($sourceid, 'nim', $nim), $record, $result);
+        self::upsert('local_siakad_mahasiswa', self::identity('sourceid', $sourceid, 'nim', $nim), $record, $result);
     }
 
     private static function upsert_dosen(object $item, object $result): void {
         global $DB;
+
         $nidn = self::required_text($item, 'nidn');
         $username = \core_text::strtolower(self::required_text($item, 'username'));
         $prodicode = \core_text::strtoupper(self::required_text($item, 'prodi'));
@@ -212,11 +285,12 @@ final class service {
             'status' => \core_text::strtolower(self::optional_text($item, 'status', manager::STATUS_AKTIF)),
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_dosen', self::identity($sourceid, 'nidn', $nidn), $record, $result);
+        self::upsert('local_siakad_dosen', self::identity('sourceid', $sourceid, 'nidn', $nidn), $record, $result);
     }
 
     private static function upsert_tagihan(object $item, object $result): void {
         global $DB;
+
         $code = self::required_text($item, 'kodetagihan');
         $nim = self::required_text($item, 'nim');
         $sourceid = self::optional_text($item, 'id');
@@ -241,15 +315,38 @@ final class service {
         ];
         if ($record->status === manager::STATUS_LUNAS && $record->paidat === 0) {
             $record->paidat = time();
-        } else if ($record->status !== manager::STATUS_LUNAS) {
+        }
+        if ($record->status !== manager::STATUS_LUNAS) {
             $record->paidat = 0;
         }
-        self::upsert('local_siakad_tagihan', self::identity($sourceid, 'kodetagihan', $code), $record, $result);
+        self::upsert('local_siakad_tagihan', self::identity('sourceid', $sourceid, 'kodetagihan', $code), $record, $result);
     }
 
     private static function upsert(string $table, array $identity, object $record, object $result): void {
         global $DB;
+
         $existing = $DB->get_record($table, $identity, 'id', IGNORE_MISSING);
+        // Manual/dummy records can predate source IDs. When the first real payload
+        // introduces sourceid, reuse the natural unique key instead of inserting a duplicate.
+        if (!$existing && !empty($record->sourceid)) {
+            $fallbackfields = [
+                'local_siakad_user' => 'username',
+                'local_siakad_prodi' => 'kode',
+                'local_siakad_mahasiswa' => 'nim',
+                'local_siakad_dosen' => 'nidn',
+                'local_siakad_tagihan' => 'kodetagihan',
+            ];
+            $fallbackfield = $fallbackfields[$table] ?? null;
+            if ($fallbackfield !== null && property_exists($record, $fallbackfield)) {
+                $existing = $DB->get_record(
+                    $table,
+                    [$fallbackfield => $record->{$fallbackfield}],
+                    'id',
+                    IGNORE_MISSING
+                );
+            }
+        }
+
         if ($existing) {
             $record->id = $existing->id;
             $DB->update_record($table, $record);
@@ -260,8 +357,8 @@ final class service {
         }
     }
 
-    private static function identity(string $sourceid, string $fallbackfield, string $fallback): array {
-        return $sourceid !== '' ? ['sourceid' => $sourceid] : [$fallbackfield => $fallback];
+    private static function identity(string $sourcefield, string $sourceid, string $fallbackfield, string $fallback): array {
+        return $sourceid !== '' ? [$sourcefield => $sourceid] : [$fallbackfield => $fallback];
     }
 
     private static function required_text(object $item, string $property): string {
@@ -290,6 +387,7 @@ final class service {
 
     private static function write_log(string $source, string $status, object $result): void {
         global $DB;
+
         $DB->insert_record('local_siakad_synclog', (object) [
             'source' => $source,
             'status' => $status,
