@@ -18,10 +18,14 @@ final class manager {
     /** @return array<int, object> */
     public static function get_active_prodi_options(): array {
         global $DB;
+
         $records = $DB->get_records('local_siakad_prodi', ['aktif' => 1], 'nama ASC', 'id,kode,nama');
         $options = [];
         foreach ($records as $record) {
-            $options[] = (object) ['code' => $record->kode, 'name' => $record->nama . ' (' . $record->kode . ')'];
+            $options[] = (object) [
+                'code' => $record->kode,
+                'name' => $record->nama . ' (' . $record->kode . ')',
+            ];
         }
         return $options;
     }
@@ -36,13 +40,29 @@ final class manager {
         ];
     }
 
-    public static function can_user_access_exam(int $moodleuserid, string $prodicode,
-            string $tahunajaran = '', string $semester = '', string $jenis = ''): bool {
-        return self::get_exam_access_decision($moodleuserid, $prodicode, $tahunajaran, $semester, $jenis)->allowed;
+    public static function can_user_access_exam(
+        int $moodleuserid,
+        string $prodicode,
+        string $tahunajaran = '',
+        string $semester = '',
+        string $jenis = ''
+    ): bool {
+        return self::get_exam_access_decision(
+            $moodleuserid,
+            $prodicode,
+            $tahunajaran,
+            $semester,
+            $jenis
+        )->allowed;
     }
 
-    public static function get_exam_access_decision(int $moodleuserid, string $prodicode,
-            string $tahunajaran = '', string $semester = '', string $jenis = ''): object {
+    public static function get_exam_access_decision(
+        int $moodleuserid,
+        string $prodicode,
+        string $tahunajaran = '',
+        string $semester = '',
+        string $jenis = ''
+    ): object {
         global $DB;
 
         $mahasiswa = self::get_mahasiswa_for_moodle_user($moodleuserid);
@@ -55,8 +75,11 @@ final class manager {
 
         $defaults = self::get_availability_defaults();
         $tahunajaran = trim($tahunajaran) !== '' ? trim($tahunajaran) : $defaults->tahunajaran;
-        $semester = trim($semester) !== '' ? self::normalise_code($semester) : self::normalise_code($defaults->semester);
+        $semester = trim($semester) !== ''
+            ? self::normalise_code($semester)
+            : self::normalise_code($defaults->semester);
         $jenis = trim($jenis);
+
         $where = ['mahasiswaid = :mahasiswaid'];
         $params = ['mahasiswaid' => (int) $mahasiswa->id];
         if ($tahunajaran !== '') {
@@ -72,15 +95,21 @@ final class manager {
             $params['jenis'] = self::normalise_code($jenis);
         }
 
-        $bills = $DB->get_records_select('local_siakad_tagihan', implode(' AND ', $where), $params, 'id ASC');
+        $bills = $DB->get_records_select(
+            'local_siakad_tagihan',
+            implode(' AND ', $where),
+            $params,
+            'id ASC'
+        );
         if (!$bills) {
             return self::decision(false, 'bill_not_found');
         }
+
         $mode = (string) get_config('local_siakadbridge', 'gatemode');
         if ($mode === 'any_lunas') {
             foreach ($bills as $bill) {
                 if (self::normalise_code($bill->status) === self::STATUS_LUNAS) {
-                    return self::decision(true, 'paid_bill_found', [$bill->id]);
+                    return self::decision(true, 'paid_bill_found', [(int) $bill->id]);
                 }
             }
             return self::decision(false, 'no_paid_bill');
@@ -92,6 +121,7 @@ final class manager {
         if (!$required) {
             return self::decision(false, 'required_bill_not_found');
         }
+
         $unpaidids = [];
         foreach ($required as $bill) {
             if (self::normalise_code($bill->status) !== self::STATUS_LUNAS) {
@@ -101,17 +131,36 @@ final class manager {
         if ($unpaidids) {
             return self::decision(false, 'required_bill_unpaid', $unpaidids);
         }
-        return self::decision(true, 'all_required_bills_paid', array_map('intval', array_keys($required)));
+
+        return self::decision(
+            true,
+            'all_required_bills_paid',
+            array_map('intval', array_keys($required))
+        );
     }
 
     public static function get_mahasiswa_for_moodle_user(int $moodleuserid): ?object {
         global $DB;
-        $moodleuser = $DB->get_record('user', ['id' => $moodleuserid], 'id,username,email', IGNORE_MISSING);
+
+        $moodleuser = $DB->get_record(
+            'user',
+            ['id' => $moodleuserid, 'deleted' => 0],
+            'id,username,email',
+            IGNORE_MISSING
+        );
         if (!$moodleuser) {
             return null;
         }
-        $conditions = ['m.moodleuserid = :studentmoodleid', 'u.moodleuserid = :usermoodleid'];
-        $params = ['studentmoodleid' => $moodleuserid, 'usermoodleid' => $moodleuserid, 'status' => self::STATUS_AKTIF];
+
+        $conditions = [
+            'm.moodleuserid = :studentmoodleid',
+            'u.moodleuserid = :usermoodleid',
+        ];
+        $params = [
+            'studentmoodleid' => $moodleuserid,
+            'usermoodleid' => $moodleuserid,
+            'status' => self::STATUS_AKTIF,
+        ];
         if ($moodleuser->username !== '') {
             $conditions[] = 'LOWER(u.username) = :username';
             $params['username'] = self::normalise_code($moodleuser->username);
@@ -120,7 +169,9 @@ final class manager {
             $conditions[] = 'LOWER(u.email) = :email';
             $params['email'] = self::normalise_code($moodleuser->email);
         }
-        $sql = 'SELECT m.* FROM {local_siakad_mahasiswa} m
+
+        $sql = 'SELECT m.*
+                  FROM {local_siakad_mahasiswa} m
                   JOIN {local_siakad_user} u ON u.id = m.userid
                  WHERE LOWER(m.status) = :status
                    AND (' . implode(' OR ', $conditions) . ')
@@ -129,135 +180,280 @@ final class manager {
         return $record ?: null;
     }
 
+    /**
+     * Link SIAKAD identities to Moodle accounts.
+     *
+     * Resolution order:
+     * 1. Existing valid moodleuserid.
+     * 2. local_pascasync mapping by the same numeric source ID.
+     * 3. Moodle idnumber pasca:{sourceid}.
+     * 4. Exact username.
+     * 5. Unique email.
+     */
     public static function link_moodle_users(): int {
         global $DB;
+
         $linked = 0;
         foreach ($DB->get_records('local_siakad_user') as $record) {
-            $moodleuser = false;
-            if ($record->username !== '') {
-                $moodleuser = $DB->get_record('user', ['username' => $record->username, 'deleted' => 0], 'id', IGNORE_MISSING);
-            }
-            if (!$moodleuser && $record->email !== '') {
-                $users = $DB->get_records('user', ['email' => $record->email, 'deleted' => 0], 'id ASC', 'id', 0, 2);
-                if (count($users) === 1) {
-                    $moodleuser = reset($users);
-                }
-            }
+            $moodleuser = self::resolve_moodle_user($record);
             if (!$moodleuser) {
+                self::set_identity_moodle_user($record, 0);
                 continue;
             }
-            $changed = false;
-            if ((int) $record->moodleuserid !== (int) $moodleuser->id) {
-                $record->moodleuserid = (int) $moodleuser->id;
-                $record->timemodified = time();
-                $DB->update_record('local_siakad_user', $record);
-                $changed = true;
-            }
-            foreach ($DB->get_records('local_siakad_mahasiswa', ['userid' => $record->id], '', 'id,moodleuserid') as $student) {
-                if ((int) $student->moodleuserid !== (int) $moodleuser->id) {
-                    $DB->set_field('local_siakad_mahasiswa', 'moodleuserid', $moodleuser->id, ['id' => $student->id]);
-                    $changed = true;
-                }
-            }
-            foreach ($DB->get_records('local_siakad_dosen', ['userid' => $record->id], '', 'id,moodleuserid') as $lecturer) {
-                if ((int) $lecturer->moodleuserid !== (int) $moodleuser->id) {
-                    $DB->set_field('local_siakad_dosen', 'moodleuserid', $moodleuser->id, ['id' => $lecturer->id]);
-                    $changed = true;
-                }
-            }
-            if ($changed) {
+            if (self::set_identity_moodle_user($record, (int) $moodleuser->id)) {
                 $linked++;
             }
         }
         return $linked;
     }
 
+    /**
+     * Reconcile student cohorts and lecturer category roles with current SIAKAD state.
+     */
     public static function reconcile_moodle_access(): object {
         global $CFG, $DB;
-        $result = (object) ['linked' => self::link_moodle_users(), 'students' => 0, 'lecturers' => 0];
+
+        $result = (object) [
+            'linked' => self::link_moodle_users(),
+            'students' => 0,
+            'lecturers' => 0,
+        ];
         require_once($CFG->dirroot . '/cohort/lib.php');
 
-        $students = $DB->get_records_select('local_siakad_mahasiswa',
-            'moodleuserid > 0 AND LOWER(status) = :status', ['status' => self::STATUS_AKTIF]);
+        // Reconcile every linked student, including inactive/unmapped records, so
+        // stale memberships are removed when status or study program changes.
+        $students = $DB->get_records_select(
+            'local_siakad_mahasiswa',
+            'moodleuserid > 0',
+            [],
+            'id ASC'
+        );
         foreach ($students as $student) {
-            $prodi = $DB->get_record('local_siakad_prodi', ['id' => $student->prodiid, 'aktif' => 1]);
-            if (!$prodi || (int) $prodi->categoryid <= 0 || !class_exists('\\local_pascaprodi\\manager')) {
-                continue;
-            }
-            $cohortidnumber = \local_pascaprodi\manager::cohort_idnumber((int) $prodi->categoryid);
-            $cohort = $DB->get_record('cohort', ['idnumber' => $cohortidnumber], 'id', IGNORE_MISSING);
-            if (!$cohort) {
-                \local_pascaprodi\manager::ensure_category_cohort((int) $prodi->categoryid);
-                $cohort = $DB->get_record('cohort', ['idnumber' => $cohortidnumber], 'id', IGNORE_MISSING);
-            }
-            if ($cohort) {
-                $like = $DB->sql_like('c.idnumber', ':prefix', false);
-                $memberships = $DB->get_records_sql(
-                    'SELECT cm.id, cm.cohortid FROM {cohort_members} cm
-                       JOIN {cohort} c ON c.id = cm.cohortid
-                      WHERE cm.userid = :userid AND ' . $like . ' AND c.id <> :targetcohort',
-                    ['userid' => $student->moodleuserid, 'prefix' => 'pasca:prodi-category:%', 'targetcohort' => $cohort->id]
+            $targetcohortid = 0;
+            $active = self::normalise_code((string) $student->status) === self::STATUS_AKTIF;
+            $prodi = $active
+                ? $DB->get_record('local_siakad_prodi', ['id' => $student->prodiid, 'aktif' => 1])
+                : false;
+
+            if ($prodi && (int) $prodi->categoryid > 0) {
+                $targetcohortid = (int) \local_pascaprodi\manager::ensure_category_cohort(
+                    (int) $prodi->categoryid
                 );
-                foreach ($memberships as $membership) {
-                    cohort_remove_member((int) $membership->cohortid, (int) $student->moodleuserid);
-                }
-                if (!$DB->record_exists('cohort_members', ['cohortid' => $cohort->id, 'userid' => $student->moodleuserid])) {
-                    cohort_add_member((int) $cohort->id, (int) $student->moodleuserid);
-                    $result->students++;
-                }
+            }
+
+            self::remove_other_generated_cohorts((int) $student->moodleuserid, $targetcohortid);
+            if ($targetcohortid > 0 && !$DB->record_exists('cohort_members', [
+                'cohortid' => $targetcohortid,
+                'userid' => $student->moodleuserid,
+            ])) {
+                cohort_add_member($targetcohortid, (int) $student->moodleuserid);
+                $result->students++;
             }
         }
+
+        // Remove all role assignments owned by this bridge first. Only active,
+        // currently mapped lecturers are assigned again below.
+        role_unassign_all(['component' => 'local_siakadbridge']);
 
         $roleshortname = trim((string) get_config('local_siakadbridge', 'lecturerroleshortname'));
         if ($roleshortname === '') {
             $roleshortname = 'editingteacher';
         }
         $role = $DB->get_record('role', ['shortname' => $roleshortname], 'id', IGNORE_MISSING);
-        if ($role) {
-            role_unassign_all(['component' => 'local_siakadbridge']);
-            $lecturers = $DB->get_records_select('local_siakad_dosen',
-                'moodleuserid > 0 AND LOWER(status) = :status', ['status' => self::STATUS_AKTIF]);
-            foreach ($lecturers as $lecturer) {
-                $prodi = $DB->get_record('local_siakad_prodi', ['id' => $lecturer->prodiid, 'aktif' => 1]);
-                if (!$prodi || (int) $prodi->categoryid <= 0) {
-                    continue;
-                }
-                $context = \context_coursecat::instance((int) $prodi->categoryid, IGNORE_MISSING);
-                if (!$context) {
-                    continue;
-                }
-                if (!$DB->record_exists('role_assignments', [
-                    'roleid' => $role->id, 'userid' => $lecturer->moodleuserid, 'contextid' => $context->id,
-                    'component' => 'local_siakadbridge', 'itemid' => $prodi->id,
-                ])) {
-                    role_assign((int) $role->id, (int) $lecturer->moodleuserid, (int) $context->id,
-                        'local_siakadbridge', (int) $prodi->id);
-                    $result->lecturers++;
-                }
-            }
+        if (!$role) {
+            return $result;
         }
+
+        $lecturers = $DB->get_records_select(
+            'local_siakad_dosen',
+            'moodleuserid > 0 AND LOWER(status) = :status',
+            ['status' => self::STATUS_AKTIF],
+            'id ASC'
+        );
+        foreach ($lecturers as $lecturer) {
+            $prodi = $DB->get_record('local_siakad_prodi', [
+                'id' => $lecturer->prodiid,
+                'aktif' => 1,
+            ]);
+            if (!$prodi || (int) $prodi->categoryid <= 0) {
+                continue;
+            }
+            $context = \context_coursecat::instance((int) $prodi->categoryid, IGNORE_MISSING);
+            if (!$context) {
+                continue;
+            }
+            role_assign(
+                (int) $role->id,
+                (int) $lecturer->moodleuserid,
+                (int) $context->id,
+                'local_siakadbridge',
+                (int) $prodi->id
+            );
+            $result->lecturers++;
+        }
+
         return $result;
     }
 
     public static function category_name(int $categoryid): string {
         global $DB;
+
         return $categoryid > 0
             ? (string) $DB->get_field('course_categories', 'name', ['id' => $categoryid], IGNORE_MISSING)
             : '';
     }
 
+    private static function resolve_moodle_user(object $record): ?object {
+        global $CFG, $DB;
+
+        $candidate = false;
+        if ((int) $record->moodleuserid > 0) {
+            $candidate = $DB->get_record(
+                'user',
+                ['id' => $record->moodleuserid, 'deleted' => 0],
+                'id,username,email,idnumber',
+                IGNORE_MISSING
+            );
+        }
+
+        $sourceid = trim((string) ($record->sourceid ?? ''));
+        if (!$candidate && $sourceid !== '' && ctype_digit($sourceid) &&
+                $DB->get_manager()->table_exists('local_pascasync_map')) {
+            $map = $DB->get_record('local_pascasync_map', ['sourceid' => (int) $sourceid], 'userid', IGNORE_MISSING);
+            if ($map) {
+                $candidate = $DB->get_record(
+                    'user',
+                    ['id' => $map->userid, 'deleted' => 0],
+                    'id,username,email,idnumber',
+                    IGNORE_MISSING
+                );
+            }
+        }
+
+        if (!$candidate && $sourceid !== '') {
+            $matches = $DB->get_records('user', [
+                'idnumber' => 'pasca:' . $sourceid,
+                'deleted' => 0,
+                'mnethostid' => $CFG->mnet_localhost_id,
+            ], 'id ASC', 'id,username,email,idnumber', 0, 2);
+            if (count($matches) === 1) {
+                $candidate = reset($matches);
+            }
+        }
+
+        if (!$candidate && trim((string) $record->username) !== '') {
+            $matches = $DB->get_records('user', [
+                'username' => trim((string) $record->username),
+                'deleted' => 0,
+                'mnethostid' => $CFG->mnet_localhost_id,
+            ], 'id ASC', 'id,username,email,idnumber', 0, 2);
+            if (count($matches) === 1) {
+                $candidate = reset($matches);
+            }
+        }
+
+        if (!$candidate && trim((string) $record->email) !== '') {
+            $emailcondition = $DB->sql_equal('email', ':email', false);
+            $matches = $DB->get_records_select(
+                'user',
+                'deleted = 0 AND mnethostid = :mnethostid AND ' . $emailcondition,
+                [
+                    'mnethostid' => $CFG->mnet_localhost_id,
+                    'email' => self::normalise_code((string) $record->email),
+                ],
+                'id ASC',
+                'id,username,email,idnumber',
+                0,
+                2
+            );
+            if (count($matches) === 1) {
+                $candidate = reset($matches);
+            }
+        }
+
+        if (!$candidate || is_siteadmin((int) $candidate->id) ||
+                (int) $candidate->id === (int) $CFG->siteguest) {
+            return null;
+        }
+        return $candidate;
+    }
+
+    /**
+     * Update the identity and all child records to the resolved Moodle user.
+     */
+    private static function set_identity_moodle_user(object $identity, int $moodleuserid): bool {
+        global $DB;
+
+        $changed = false;
+        if ((int) $identity->moodleuserid !== $moodleuserid) {
+            $identity->moodleuserid = $moodleuserid;
+            $identity->timemodified = time();
+            $DB->update_record('local_siakad_user', $identity);
+            $changed = true;
+        }
+
+        foreach ($DB->get_records('local_siakad_mahasiswa', ['userid' => $identity->id], '', 'id,moodleuserid') as $student) {
+            if ((int) $student->moodleuserid !== $moodleuserid) {
+                $DB->set_field('local_siakad_mahasiswa', 'moodleuserid', $moodleuserid, ['id' => $student->id]);
+                $changed = true;
+            }
+        }
+        foreach ($DB->get_records('local_siakad_dosen', ['userid' => $identity->id], '', 'id,moodleuserid') as $lecturer) {
+            if ((int) $lecturer->moodleuserid !== $moodleuserid) {
+                $DB->set_field('local_siakad_dosen', 'moodleuserid', $moodleuserid, ['id' => $lecturer->id]);
+                $changed = true;
+            }
+        }
+        return $changed;
+    }
+
+    /**
+     * Remove a user from generated student cohorts other than the target.
+     */
+    private static function remove_other_generated_cohorts(int $moodleuserid, int $targetcohortid): void {
+        global $DB;
+
+        $like = $DB->sql_like('c.idnumber', ':prefix', false);
+        $sql = 'SELECT cm.id, cm.cohortid
+                  FROM {cohort_members} cm
+                  JOIN {cohort} c ON c.id = cm.cohortid
+                 WHERE cm.userid = :userid
+                   AND ' . $like;
+        $params = [
+            'userid' => $moodleuserid,
+            'prefix' => 'pasca:prodi-category:%',
+        ];
+        if ($targetcohortid > 0) {
+            $sql .= ' AND c.id <> :targetcohort';
+            $params['targetcohort'] = $targetcohortid;
+        }
+        foreach ($DB->get_records_sql($sql, $params) as $membership) {
+            cohort_remove_member((int) $membership->cohortid, $moodleuserid);
+        }
+    }
+
     private static function is_user_in_prodi(int $prodiid, string $prodicode): bool {
         global $DB;
+
         $prodicode = trim($prodicode);
         if ($prodicode === self::PRODI_ANY) {
             return true;
         }
-        $prodi = $DB->get_record('local_siakad_prodi', ['id' => $prodiid, 'aktif' => 1], 'id,kode', IGNORE_MISSING);
+        $prodi = $DB->get_record(
+            'local_siakad_prodi',
+            ['id' => $prodiid, 'aktif' => 1],
+            'id,kode',
+            IGNORE_MISSING
+        );
         return $prodi && self::normalise_code($prodi->kode) === self::normalise_code($prodicode);
     }
 
     private static function decision(bool $allowed, string $reason, array $billids = []): object {
-        return (object) ['allowed' => $allowed, 'reason' => $reason, 'billids' => $billids];
+        return (object) [
+            'allowed' => $allowed,
+            'reason' => $reason,
+            'billids' => $billids,
+        ];
     }
 
     private static function normalise_code(string $value): string {
