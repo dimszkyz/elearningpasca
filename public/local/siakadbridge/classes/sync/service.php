@@ -21,8 +21,15 @@ final class service {
         }
 
         $url = trim((string) get_config('local_siakadbridge', 'apiurl'));
-        if ($url === '') {
-            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '', 'SIAKAD API URL is empty.');
+        $token = trim((string) get_config('local_siakadbridge', 'apitoken'));
+        $parts = parse_url($url);
+        if ($url === '' || !is_array($parts) ||
+                !in_array($parts['scheme'] ?? '', ['http', 'https'], true) || empty($parts['host'])) {
+            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '', 'SIAKAD API URL is invalid.');
+        }
+        if ($token === '') {
+            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '',
+                'A bearer token is required in REST mode.');
         }
 
         $lockfactory = \core\lock\lock_config::get_lock_factory('local_siakadbridge');
@@ -33,7 +40,7 @@ final class service {
         }
 
         try {
-            $payload = self::fetch_payload($url);
+            $payload = self::fetch_payload($url, $token);
             return self::import_payload($payload, 'rest');
         } finally {
             $lock->release();
@@ -102,26 +109,37 @@ final class service {
         return $result;
     }
 
-    private static function fetch_payload(string $url): object {
+    private static function fetch_payload(string $url, string $token): object {
         global $CFG;
 
         require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $headers = ['Accept: application/json'];
-        $token = trim((string) get_config('local_siakadbridge', 'apitoken'));
-        if ($token !== '') {
-            $headers[] = 'Authorization: Bearer ' . $token;
-        }
-        $curl->setHeader($headers);
+        $allowprivatehost = (bool) get_config('local_siakadbridge', 'allowprivatehost');
+        $curl = new \curl(['ignoresecurity' => $allowprivatehost]);
+        $curl->setHeader([
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+            'Cache-Control: no-cache',
+            'Expect:',
+        ]);
 
         $timeout = (int) get_config('local_siakadbridge', 'apitimeout');
-        $timeout = $timeout > 0 ? $timeout : 30;
+        $timeout = max(5, min(300, $timeout > 0 ? $timeout : 30));
         $response = $curl->get($url, [], [
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
+            'CONNECTTIMEOUT' => min(15, $timeout),
+            'TIMEOUT' => $timeout,
+            'RETURNTRANSFER' => true,
+            'HEADER' => false,
         ]);
-        $info = $curl->get_info();
-        $status = (int) ($info['http_code'] ?? 0);
+        if (!empty($curl->errno)) {
+            throw new \moodle_exception(
+                'syncfailed',
+                'local_siakadbridge',
+                '',
+                clean_param((string) $curl->error, PARAM_TEXT)
+            );
+        }
+
+        $status = (int) ($curl->info['http_code'] ?? 0);
         if ($response === false || $status < 200 || $status >= 300) {
             throw new \moodle_exception(
                 'syncfailed',
@@ -131,14 +149,19 @@ final class service {
             );
         }
 
-        $payload = json_decode((string) $response);
-        if (!is_object($payload) || json_last_error() !== JSON_ERROR_NONE) {
+        try {
+            $payload = json_decode((string) $response, false, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
             throw new \moodle_exception(
                 'syncfailed',
                 'local_siakadbridge',
                 '',
-                'Invalid JSON: ' . json_last_error_msg()
+                'Invalid JSON: ' . $exception->getMessage()
             );
+        }
+        if (!is_object($payload)) {
+            throw new \moodle_exception('syncfailed', 'local_siakadbridge', '',
+                'The SIAKAD response root must be a JSON object.');
         }
         return $payload;
     }
@@ -231,14 +254,21 @@ final class service {
                 : (int) ($existing->categoryid ?? 0),
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_prodi', self::identity('sourceid', $sourceid, 'kode', $kode), $record, $result);
+        self::upsert(
+            'local_siakad_prodi',
+            self::identity('sourceid', $sourceid, 'kode', $kode),
+            $record,
+            $result
+        );
     }
 
     private static function upsert_user(object $item, object $result): void {
         $username = \core_text::strtolower(self::required_text($item, 'username'));
         $sourceid = self::optional_text($item, 'id');
         $existing = self::find_existing('local_siakad_user', $sourceid, 'username', $username);
-        $role = \core_text::strtolower(self::optional_text($item, 'role', (string) ($existing->role ?? 'mahasiswa')));
+        $role = \core_text::strtolower(
+            self::optional_text($item, 'role', (string) ($existing->role ?? 'mahasiswa'))
+        );
         if (!in_array($role, ['mahasiswa', 'dosen', 'admin'], true)) {
             throw new \invalid_parameter_exception('Invalid SIAKAD user role: ' . $role);
         }
@@ -254,7 +284,12 @@ final class service {
                 : (int) ($existing->moodleuserid ?? 0),
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_user', self::identity('sourceid', $sourceid, 'username', $username), $record, $result);
+        self::upsert(
+            'local_siakad_user',
+            self::identity('sourceid', $sourceid, 'username', $username),
+            $record,
+            $result
+        );
     }
 
     private static function upsert_mahasiswa(object $item, object $result): void {
@@ -267,7 +302,9 @@ final class service {
         $user = $DB->get_record('local_siakad_user', ['username' => $username], '*', MUST_EXIST);
         $prodi = $DB->get_record('local_siakad_prodi', ['kode' => $prodicode], '*', MUST_EXIST);
         $existing = self::find_existing('local_siakad_mahasiswa', $sourceid, 'nim', $nim);
-        $status = \core_text::strtolower(self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF)));
+        $status = \core_text::strtolower(
+            self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF))
+        );
         if (!in_array($status, ['aktif', 'cuti', 'lulus', 'nonaktif'], true)) {
             throw new \invalid_parameter_exception('Invalid student status: ' . $status);
         }
@@ -284,7 +321,12 @@ final class service {
             'status' => $status,
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_mahasiswa', self::identity('sourceid', $sourceid, 'nim', $nim), $record, $result);
+        self::upsert(
+            'local_siakad_mahasiswa',
+            self::identity('sourceid', $sourceid, 'nim', $nim),
+            $record,
+            $result
+        );
     }
 
     private static function upsert_dosen(object $item, object $result): void {
@@ -297,7 +339,9 @@ final class service {
         $user = $DB->get_record('local_siakad_user', ['username' => $username], '*', MUST_EXIST);
         $prodi = $DB->get_record('local_siakad_prodi', ['kode' => $prodicode], '*', MUST_EXIST);
         $existing = self::find_existing('local_siakad_dosen', $sourceid, 'nidn', $nidn);
-        $status = \core_text::strtolower(self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF)));
+        $status = \core_text::strtolower(
+            self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF))
+        );
         if (!in_array($status, ['aktif', 'nonaktif'], true)) {
             throw new \invalid_parameter_exception('Invalid lecturer status: ' . $status);
         }
@@ -314,7 +358,12 @@ final class service {
             'status' => $status,
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_dosen', self::identity('sourceid', $sourceid, 'nidn', $nidn), $record, $result);
+        self::upsert(
+            'local_siakad_dosen',
+            self::identity('sourceid', $sourceid, 'nidn', $nidn),
+            $record,
+            $result
+        );
     }
 
     private static function upsert_tagihan(object $item, object $result): void {
@@ -326,7 +375,11 @@ final class service {
         $student = $DB->get_record('local_siakad_mahasiswa', ['nim' => $nim], '*', MUST_EXIST);
         $existing = self::find_existing('local_siakad_tagihan', $sourceid, 'kodetagihan', $code);
         $status = \core_text::strtolower(self::required_text($item, 'status'));
-        if (!in_array($status, [manager::STATUS_LUNAS, manager::STATUS_BELUM_LUNAS, manager::STATUS_DIBATALKAN], true)) {
+        if (!in_array($status, [
+            manager::STATUS_LUNAS,
+            manager::STATUS_BELUM_LUNAS,
+            manager::STATUS_DIBATALKAN,
+        ], true)) {
             throw new \invalid_parameter_exception('Invalid billing status: ' . $status);
         }
         $semester = \core_text::strtolower(self::required_text($item, 'semester'));
@@ -342,6 +395,7 @@ final class service {
         } else if ($status !== manager::STATUS_LUNAS) {
             $paidat = 0;
         }
+
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'mahasiswaid' => $student->id,
@@ -362,7 +416,12 @@ final class service {
                 : (int) ($existing->duedate ?? 0),
             'timemodified' => time(),
         ];
-        self::upsert('local_siakad_tagihan', self::identity('sourceid', $sourceid, 'kodetagihan', $code), $record, $result);
+        self::upsert(
+            'local_siakad_tagihan',
+            self::identity('sourceid', $sourceid, 'kodetagihan', $code),
+            $record,
+            $result
+        );
     }
 
     private static function find_existing(
@@ -418,7 +477,12 @@ final class service {
         }
     }
 
-    private static function identity(string $sourcefield, string $sourceid, string $fallbackfield, string $fallback): array {
+    private static function identity(
+        string $sourcefield,
+        string $sourceid,
+        string $fallbackfield,
+        string $fallback
+    ): array {
         return $sourceid !== '' ? [$sourcefield => $sourceid] : [$fallbackfield => $fallback];
     }
 
@@ -442,7 +506,12 @@ final class service {
         return $timestamp === false ? 0 : $timestamp;
     }
 
-    private static function result(int $inserted = 0, int $updated = 0, int $failed = 0, string $message = ''): object {
+    private static function result(
+        int $inserted = 0,
+        int $updated = 0,
+        int $failed = 0,
+        string $message = ''
+    ): object {
         return (object) compact('inserted', 'updated', 'failed', 'message');
     }
 
