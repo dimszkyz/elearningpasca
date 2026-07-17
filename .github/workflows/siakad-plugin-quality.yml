@@ -1,0 +1,33 @@
+name: SIAKAD plugin quality
+
+on:
+  pull_request:
+    paths:
+      - 'public/local/siakadbridge/**'
+      - 'public/availability/condition/siakadpaid/**'
+      - 'docs/siakad*'
+      - '.github/workflows/siakad-plugin-quality.yml'
+  push:
+    branches:
+      - feature/siakad-complete-integration
+    paths:
+      - 'public/local/siakadbridge/**'
+      - 'public/availability/condition/siakadpaid/**'
+
+jobs:
+  php-syntax:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+      - name: Lint SIAKAD PHP files
+        run: |
+          find public/local/siakadbridge public/availability/condition/siakadpaid \
+            -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate JSON metadata
+        run: python -m json.tool public/availability/condition/siakadpaid/yui/src/form/meta/form.json >/dev/null
