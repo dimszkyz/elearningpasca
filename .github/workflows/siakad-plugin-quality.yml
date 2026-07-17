@@ -13,11 +13,18 @@ on:
     paths:
       - 'public/local/siakadbridge/**'
       - 'public/availability/condition/siakadpaid/**'
+      - 'docs/siakad*'
+      - '.github/workflows/siakad-plugin-quality.yml'
+
+concurrency:
+  group: siakad-plugin-quality-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   php-syntax:
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         php: ['8.3', '8.4']
     steps:
@@ -29,5 +36,12 @@ jobs:
         run: |
           find public/local/siakadbridge public/availability/condition/siakadpaid \
             -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate JavaScript syntax
+        run: |
+          node --check public/availability/condition/siakadpaid/yui/src/form/js/form.js
+          node --check public/availability/condition/siakadpaid/yui/build/moodle-availability_siakadpaid-form/moodle-availability_siakadpaid-form.js
+          node --check public/availability/condition/siakadpaid/yui/build/moodle-availability_siakadpaid-form/moodle-availability_siakadpaid-form-debug.js
       - name: Validate JSON metadata
         run: python -m json.tool public/availability/condition/siakadpaid/yui/src/form/meta/form.json >/dev/null
+      - name: Validate XMLDB schema XML
+        run: python -c "import xml.etree.ElementTree as ET; ET.parse('public/local/siakadbridge/db/install.xml')"
