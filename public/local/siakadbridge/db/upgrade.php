@@ -102,5 +102,10 @@ function xmldb_local_siakadbridge_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026071700, 'local', 'siakadbridge');
     }
 
+    if ($oldversion < 2026071701) {
+        // Version 1.0.1 adds the explicit local_pascaprodi dependency.
+        upgrade_plugin_savepoint(true, 2026071701, 'local', 'siakadbridge');
+    }
+
     return true;
 }
