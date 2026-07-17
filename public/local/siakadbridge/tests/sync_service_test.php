@@ -62,4 +62,38 @@ JSON
         $this->assertSame('dibatalkan', $DB->get_field('local_siakad_tagihan', 'status', ['kodetagihan' => 'UKT-1']));
         $this->assertEquals(0, $DB->get_field('local_siakad_tagihan', 'wajib', ['kodetagihan' => 'UKT-1']));
     }
+
+    public function test_real_source_ids_reuse_existing_dummy_records(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $DB->insert_record('local_siakad_prodi', (object) [
+            'sourceid' => null,
+            'kode' => 'TI',
+            'nama' => 'Teknologi Informasi Dummy',
+            'aktif' => 1,
+            'categoryid' => 0,
+            'timemodified' => time(),
+        ]);
+        $payload = (object) [
+            'prodi' => [(object) [
+                'id' => 'prodi-ti',
+                'kode' => 'TI',
+                'nama' => 'Teknologi Informasi',
+                'aktif' => true,
+            ]],
+            'users' => [],
+            'mahasiswa' => [],
+            'dosen' => [],
+            'tagihan' => [],
+        ];
+
+        $result = \local_siakadbridge\sync\service::import_payload($payload, 'test');
+
+        $this->assertSame(0, $result->inserted);
+        $this->assertSame(1, $result->updated);
+        $this->assertEquals(1, $DB->count_records('local_siakad_prodi'));
+        $this->assertSame('prodi-ti', $DB->get_field('local_siakad_prodi', 'sourceid', ['kode' => 'TI']));
+        $this->assertSame('Teknologi Informasi', $DB->get_field('local_siakad_prodi', 'nama', ['kode' => 'TI']));
+    }
 }
