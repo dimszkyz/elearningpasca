@@ -23,6 +23,7 @@ JSON
 );
 
         $first = \local_siakadbridge\sync\service::import_payload($payload, 'test');
+        $DB->set_field('local_siakad_tagihan', 'paidat', 123456, ['kodetagihan' => 'UKT-1']);
         $second = \local_siakadbridge\sync\service::import_payload($payload, 'test');
 
         $this->assertSame(4, $first->inserted);
@@ -30,6 +31,7 @@ JSON
         $this->assertSame(0, $second->inserted);
         $this->assertSame(4, $second->updated);
         $this->assertEquals(1, $DB->count_records('local_siakad_tagihan'));
+        $this->assertEquals(123456, $DB->get_field('local_siakad_tagihan', 'paidat', ['kodetagihan' => 'UKT-1']));
     }
 
     public function test_full_snapshot_deactivates_missing_records(): void {
@@ -72,7 +74,7 @@ JSON
             'kode' => 'TI',
             'nama' => 'Teknologi Informasi Dummy',
             'aktif' => 1,
-            'categoryid' => 0,
+            'categoryid' => 42,
             'timemodified' => time(),
         ]);
         $payload = (object) [
@@ -95,5 +97,6 @@ JSON
         $this->assertEquals(1, $DB->count_records('local_siakad_prodi'));
         $this->assertSame('prodi-ti', $DB->get_field('local_siakad_prodi', 'sourceid', ['kode' => 'TI']));
         $this->assertSame('Teknologi Informasi', $DB->get_field('local_siakad_prodi', 'nama', ['kode' => 'TI']));
+        $this->assertEquals(42, $DB->get_field('local_siakad_prodi', 'categoryid', ['kode' => 'TI']));
     }
 }
