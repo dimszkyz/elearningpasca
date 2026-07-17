@@ -216,12 +216,19 @@ final class service {
     private static function upsert_prodi(object $item, object $result): void {
         $kode = \core_text::strtoupper(self::required_text($item, 'kode'));
         $sourceid = self::optional_text($item, 'id');
+        $existing = self::find_existing('local_siakad_prodi', $sourceid, 'kode', $kode);
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'kode' => $kode,
             'nama' => self::required_text($item, 'nama'),
-            'aktif' => isset($item->aktif) ? (int) (bool) $item->aktif : 1,
-            'categoryid' => isset($item->categoryid) ? max(0, (int) $item->categoryid) : 0,
+            'aktif' => property_exists($item, 'aktif')
+                ? (int) (bool) $item->aktif
+                : (int) ($existing->aktif ?? 1),
+            // categoryid is Moodle-local state. Preserve the admin mapping unless
+            // the payload explicitly provides a replacement.
+            'categoryid' => property_exists($item, 'categoryid')
+                ? max(0, (int) $item->categoryid)
+                : (int) ($existing->categoryid ?? 0),
             'timemodified' => time(),
         ];
         self::upsert('local_siakad_prodi', self::identity('sourceid', $sourceid, 'kode', $kode), $record, $result);
@@ -230,13 +237,21 @@ final class service {
     private static function upsert_user(object $item, object $result): void {
         $username = \core_text::strtolower(self::required_text($item, 'username'));
         $sourceid = self::optional_text($item, 'id');
+        $existing = self::find_existing('local_siakad_user', $sourceid, 'username', $username);
+        $role = \core_text::strtolower(self::optional_text($item, 'role', (string) ($existing->role ?? 'mahasiswa')));
+        if (!in_array($role, ['mahasiswa', 'dosen', 'admin'], true)) {
+            throw new \invalid_parameter_exception('Invalid SIAKAD user role: ' . $role);
+        }
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'username' => $username,
             'fullname' => self::required_text($item, 'fullname'),
             'email' => self::optional_text($item, 'email'),
-            'role' => \core_text::strtolower(self::optional_text($item, 'role', 'mahasiswa')),
-            'moodleuserid' => isset($item->moodleuserid) ? max(0, (int) $item->moodleuserid) : 0,
+            'role' => $role,
+            // Moodle linkage is local state and must not be erased by normal API payloads.
+            'moodleuserid' => property_exists($item, 'moodleuserid')
+                ? max(0, (int) $item->moodleuserid)
+                : (int) ($existing->moodleuserid ?? 0),
             'timemodified' => time(),
         ];
         self::upsert('local_siakad_user', self::identity('sourceid', $sourceid, 'username', $username), $record, $result);
@@ -251,15 +266,22 @@ final class service {
         $sourceid = self::optional_text($item, 'id');
         $user = $DB->get_record('local_siakad_user', ['username' => $username], '*', MUST_EXIST);
         $prodi = $DB->get_record('local_siakad_prodi', ['kode' => $prodicode], '*', MUST_EXIST);
+        $existing = self::find_existing('local_siakad_mahasiswa', $sourceid, 'nim', $nim);
+        $status = \core_text::strtolower(self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF)));
+        if (!in_array($status, ['aktif', 'cuti', 'lulus', 'nonaktif'], true)) {
+            throw new \invalid_parameter_exception('Invalid student status: ' . $status);
+        }
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'userid' => $user->id,
-            'moodleuserid' => isset($item->moodleuserid) ? max(0, (int) $item->moodleuserid) : (int) $user->moodleuserid,
+            'moodleuserid' => property_exists($item, 'moodleuserid')
+                ? max(0, (int) $item->moodleuserid)
+                : max((int) ($existing->moodleuserid ?? 0), (int) $user->moodleuserid),
             'nim' => $nim,
             'nama' => self::required_text($item, 'nama'),
             'email' => self::optional_text($item, 'email'),
             'prodiid' => $prodi->id,
-            'status' => \core_text::strtolower(self::optional_text($item, 'status', manager::STATUS_AKTIF)),
+            'status' => $status,
             'timemodified' => time(),
         ];
         self::upsert('local_siakad_mahasiswa', self::identity('sourceid', $sourceid, 'nim', $nim), $record, $result);
@@ -274,15 +296,22 @@ final class service {
         $sourceid = self::optional_text($item, 'id');
         $user = $DB->get_record('local_siakad_user', ['username' => $username], '*', MUST_EXIST);
         $prodi = $DB->get_record('local_siakad_prodi', ['kode' => $prodicode], '*', MUST_EXIST);
+        $existing = self::find_existing('local_siakad_dosen', $sourceid, 'nidn', $nidn);
+        $status = \core_text::strtolower(self::optional_text($item, 'status', (string) ($existing->status ?? manager::STATUS_AKTIF)));
+        if (!in_array($status, ['aktif', 'nonaktif'], true)) {
+            throw new \invalid_parameter_exception('Invalid lecturer status: ' . $status);
+        }
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'userid' => $user->id,
-            'moodleuserid' => isset($item->moodleuserid) ? max(0, (int) $item->moodleuserid) : (int) $user->moodleuserid,
+            'moodleuserid' => property_exists($item, 'moodleuserid')
+                ? max(0, (int) $item->moodleuserid)
+                : max((int) ($existing->moodleuserid ?? 0), (int) $user->moodleuserid),
             'nidn' => $nidn,
             'nama' => self::required_text($item, 'nama'),
             'email' => self::optional_text($item, 'email'),
             'prodiid' => $prodi->id,
-            'status' => \core_text::strtolower(self::optional_text($item, 'status', manager::STATUS_AKTIF)),
+            'status' => $status,
             'timemodified' => time(),
         ];
         self::upsert('local_siakad_dosen', self::identity('sourceid', $sourceid, 'nidn', $nidn), $record, $result);
@@ -295,31 +324,63 @@ final class service {
         $nim = self::required_text($item, 'nim');
         $sourceid = self::optional_text($item, 'id');
         $student = $DB->get_record('local_siakad_mahasiswa', ['nim' => $nim], '*', MUST_EXIST);
-        $status = \core_text::strtolower(self::optional_text($item, 'status', manager::STATUS_BELUM_LUNAS));
+        $existing = self::find_existing('local_siakad_tagihan', $sourceid, 'kodetagihan', $code);
+        $status = \core_text::strtolower(self::required_text($item, 'status'));
         if (!in_array($status, [manager::STATUS_LUNAS, manager::STATUS_BELUM_LUNAS, manager::STATUS_DIBATALKAN], true)) {
             throw new \invalid_parameter_exception('Invalid billing status: ' . $status);
+        }
+        $semester = \core_text::strtolower(self::required_text($item, 'semester'));
+        if (!in_array($semester, ['ganjil', 'genap'], true)) {
+            throw new \invalid_parameter_exception('Invalid semester: ' . $semester);
+        }
+
+        $paidat = property_exists($item, 'paidat')
+            ? self::timestamp($item->paidat)
+            : (int) ($existing->paidat ?? 0);
+        if ($status === manager::STATUS_LUNAS && $paidat === 0) {
+            $paidat = time();
+        } else if ($status !== manager::STATUS_LUNAS) {
+            $paidat = 0;
         }
         $record = (object) [
             'sourceid' => $sourceid !== '' ? $sourceid : null,
             'mahasiswaid' => $student->id,
             'kodetagihan' => $code,
             'tahunajaran' => self::required_text($item, 'tahunajaran'),
-            'semester' => \core_text::strtolower(self::required_text($item, 'semester')),
-            'jenis' => self::optional_text($item, 'jenis', 'UKT'),
-            'nominal' => max(0, (int) ($item->nominal ?? 0)),
+            'semester' => $semester,
+            'jenis' => self::optional_text($item, 'jenis', (string) ($existing->jenis ?? 'UKT')),
+            'nominal' => property_exists($item, 'nominal')
+                ? max(0, (int) $item->nominal)
+                : max(0, (int) ($existing->nominal ?? 0)),
             'status' => $status,
-            'wajib' => isset($item->wajib) ? (int) (bool) $item->wajib : 1,
-            'paidat' => self::timestamp($item->paidat ?? 0),
-            'duedate' => self::timestamp($item->duedate ?? 0),
+            'wajib' => property_exists($item, 'wajib')
+                ? (int) (bool) $item->wajib
+                : (int) ($existing->wajib ?? 1),
+            'paidat' => $paidat,
+            'duedate' => property_exists($item, 'duedate')
+                ? self::timestamp($item->duedate)
+                : (int) ($existing->duedate ?? 0),
             'timemodified' => time(),
         ];
-        if ($record->status === manager::STATUS_LUNAS && $record->paidat === 0) {
-            $record->paidat = time();
-        }
-        if ($record->status !== manager::STATUS_LUNAS) {
-            $record->paidat = 0;
-        }
         self::upsert('local_siakad_tagihan', self::identity('sourceid', $sourceid, 'kodetagihan', $code), $record, $result);
+    }
+
+    private static function find_existing(
+        string $table,
+        string $sourceid,
+        string $fallbackfield,
+        string $fallback
+    ): ?object {
+        global $DB;
+
+        $existing = false;
+        if ($sourceid !== '') {
+            $existing = $DB->get_record($table, ['sourceid' => $sourceid], '*', IGNORE_MISSING);
+        }
+        if (!$existing) {
+            $existing = $DB->get_record($table, [$fallbackfield => $fallback], '*', IGNORE_MISSING);
+        }
+        return $existing ?: null;
     }
 
     private static function upsert(string $table, array $identity, object $record, object $result): void {
