@@ -4,7 +4,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 if ($hassiteconfig) {
-    $settings = new admin_settingpage('local_siakadbridge_settings', get_string('settings', 'local_siakadbridge'));
+    $settings = new admin_settingpage(
+        'local_siakadbridge_settings',
+        get_string('settings', 'local_siakadbridge')
+    );
     $ADMIN->add('localplugins', $settings);
 
     $settings->add(new admin_setting_configselect(
@@ -29,6 +32,12 @@ if ($hassiteconfig) {
         get_string('apitoken', 'local_siakadbridge'),
         get_string('apitoken_desc', 'local_siakadbridge'),
         ''
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_siakadbridge/allowprivatehost',
+        get_string('allowprivatehost', 'local_siakadbridge'),
+        get_string('allowprivatehost_desc', 'local_siakadbridge'),
+        0
     ));
     $settings->add(new admin_setting_configtext(
         'local_siakadbridge/apitimeout',

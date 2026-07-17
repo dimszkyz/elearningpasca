@@ -71,7 +71,11 @@ function xmldb_local_siakadbridge_upgrade(int $oldversion): bool {
             ['local_siakad_mahasiswa', new xmldb_index('sourceid_uix', XMLDB_INDEX_UNIQUE, ['sourceid'])],
             ['local_siakad_dosen', new xmldb_index('sourceid_uix', XMLDB_INDEX_UNIQUE, ['sourceid'])],
             ['local_siakad_tagihan', new xmldb_index('sourceid_uix', XMLDB_INDEX_UNIQUE, ['sourceid'])],
-            ['local_siakad_tagihan', new xmldb_index('mahasiswa_period_ix', XMLDB_INDEX_NOTUNIQUE, ['mahasiswaid', 'tahunajaran', 'semester', 'wajib', 'status'])],
+            ['local_siakad_tagihan', new xmldb_index(
+                'mahasiswa_period_ix',
+                XMLDB_INDEX_NOTUNIQUE,
+                ['mahasiswaid', 'tahunajaran', 'semester', 'wajib', 'status']
+            )],
         ];
         foreach ($indexes as [$tablename, $index]) {
             $table = new xmldb_table($tablename);
@@ -105,6 +109,13 @@ function xmldb_local_siakadbridge_upgrade(int $oldversion): bool {
     if ($oldversion < 2026071701) {
         // Version 1.0.1 adds the explicit local_pascaprodi dependency.
         upgrade_plugin_savepoint(true, 2026071701, 'local', 'siakadbridge');
+    }
+
+    if ($oldversion < 2026071702) {
+        if (get_config('local_siakadbridge', 'allowprivatehost') === false) {
+            set_config('allowprivatehost', 0, 'local_siakadbridge');
+        }
+        upgrade_plugin_savepoint(true, 2026071702, 'local', 'siakadbridge');
     }
 
     return true;
