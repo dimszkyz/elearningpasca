@@ -23,6 +23,7 @@ Branch implementasi: `feature/siakad-complete-integration`.
    - Menambahkan kondisi **Tagihan dan program studi SIAKAD** pada `Restrict access`.
    - Dosen memilih Prodi, tahun ajaran, semester, dan opsional jenis tagihan.
    - Akses diberikan hanya kepada mahasiswa aktif pada Prodi yang sesuai dan seluruh tagihan wajib pada periode tersebut berstatus `lunas`.
+   - Mahasiswa melihat keterangan lengkap mengenai Prodi, tahun ajaran, semester, jenis tagihan, serta alasan umum akses dapat ditolak.
 
 ## Tabel Moodle
 
@@ -43,6 +44,14 @@ Tabel `local_siakad_*` sengaja digunakan agar tidak bertabrakan dengan tabel int
 cd /d "D:\Coding Job\Moodle\elearningpasca"
 git fetch origin
 git checkout feature/siakad-complete-integration
+git pull origin feature/siakad-complete-integration
+```
+
+Jalankan upgrade dan bersihkan cache:
+
+```bat
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe admin\cli\upgrade.php --non-interactive
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe admin\cli\purge_caches.php
 ```
 
 Buka:
@@ -56,13 +65,15 @@ Moodle akan memasang plugin baru atau meng-upgrade instalasi lama dari versi dum
 Seed data pengujian:
 
 ```bat
-D:\laragon\bin\php\php-8.4.23-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\seed_dummy.php --reset
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\seed_dummy.php --reset
 ```
+
+Perintah `--reset` menghapus data bridge yang ada sebelum membuat data dummy. Jangan menjalankannya pada data yang ingin dipertahankan.
 
 Selaraskan user, cohort, dan role:
 
 ```bat
-D:\laragon\bin\php\php-8.4.23-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\reconcile.php
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\reconcile.php
 ```
 
 ## Provisioning akun Moodle
@@ -103,6 +114,19 @@ Halaman yang tersedia:
 - **Pemetaan prodi SIAKAD**: hubungkan kode Prodi dengan Course Category Moodle.
 - **Sinkronisasi SIAKAD**: jalankan sinkronisasi manual dan lihat log.
 
+## Mengatur ujian per Prodi dan periode
+
+Pada Quiz Moodle:
+
+1. buka **Edit settings**;
+2. pada **Restrict access**, klik **Add restriction**;
+3. pilih **Tagihan dan program studi SIAKAD**;
+4. pilih Program Studi;
+5. isi tahun ajaran;
+6. pilih semester ganjil atau genap;
+7. pilih jenis tagihan bila ujian hanya bergantung pada jenis tagihan tertentu;
+8. simpan Quiz.
+
 ## Aturan akses ujian
 
 Mode yang direkomendasikan:
@@ -114,12 +138,24 @@ Semua tagihan wajib pada periode terpilih harus lunas
 Keputusan akses menolak mahasiswa bila:
 
 - akun Moodle tidak dapat dipetakan ke mahasiswa aktif;
-- Prodi tidak sama dengan Prodi pada Quiz;
-- tidak ada tagihan pada periode terpilih;
+- Prodi mahasiswa tidak sama dengan Prodi pada Quiz;
+- tidak ada tagihan pada tahun ajaran dan semester yang dipilih;
 - tidak ada tagihan yang ditandai wajib;
 - minimal satu tagihan wajib belum berstatus `lunas`.
 
 Tagihan opsional (`wajib = 0`) tidak memblokir ujian. Tagihan berstatus `dibatalkan` tidak dihitung sebagai tagihan yang harus dibayar.
+
+Keterangan pada Quiz menjelaskan bahwa ujian hanya tersedia bagi mahasiswa aktif dari Prodi, tahun ajaran, dan semester yang dipilih dengan seluruh tagihan wajib lunas. Keterangan juga menyebutkan bahwa akses dapat ditolak karena akun belum terhubung, Prodi berbeda, periode tidak sesuai, data tagihan tidak ditemukan, atau masih terdapat tagihan wajib yang belum lunas.
+
+## Matriks keputusan akses
+
+| Kondisi mahasiswa | Hasil |
+|---|---|
+| aktif, Prodi sama, periode sama, seluruh tagihan wajib lunas | diizinkan |
+| aktif, Prodi sama, tetapi ada tagihan wajib belum lunas | ditolak |
+| aktif dan lunas, tetapi Prodi berbeda | ditolak |
+| aktif dan Prodi sama, tetapi tahun ajaran/semester tidak memiliki tagihan | ditolak |
+| mahasiswa cuti, lulus, nonaktif, atau akun tidak terhubung | ditolak |
 
 ## Format REST API
 
@@ -174,7 +210,7 @@ Nilai status dosen yang diterima:
 Cron Moodle harus berjalan agar sinkronisasi REST otomatis aktif:
 
 ```bat
-D:\laragon\bin\php\php-8.4.23-Win32-vs17-x64\php.exe public\admin\cli\cron.php
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe admin\cli\cron.php
 ```
 
 Pada server Linux, jalankan cron Moodle setiap menit; task SIAKAD sendiri dijadwalkan setiap 15 menit. Lock Moodle mencegah dua sinkronisasi berjalan bersamaan.
