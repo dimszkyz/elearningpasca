@@ -62,13 +62,13 @@ http://elearningpasca.test/admin/index.php
 
 Moodle akan memasang plugin baru atau meng-upgrade instalasi lama dari versi dummy sebelumnya.
 
-Seed data pengujian:
+Seed data pengujian dan buat akun Moodle dummy yang belum ada:
 
 ```bat
-D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\seed_dummy.php --reset
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\seed_dummy.php --create-moodle-users
 ```
 
-Perintah `--reset` menghapus data bridge yang ada sebelum membuat data dummy. Jangan menjalankannya pada data yang ingin dipertahankan.
+Seeder tidak menghapus akun Moodle yang sudah ada. Opsi `--reset` tersedia untuk lingkungan pengujian yang datanya memang boleh dibersihkan, tetapi tidak digunakan pada prosedur standar.
 
 Selaraskan user, cohort, dan role:
 
@@ -88,16 +88,32 @@ Pada produksi, jalankan sinkronisasi akun melalui `local_pascasync` terlebih dah
 
 Karena itu, nilai `users[].id` pada payload SIAKAD sebaiknya sama dengan `source_id` user pada API Pasca. Untuk pengujian manual, akun dengan username/email yang sama masih didukung. `local_siakadbridge` tidak mengimpor atau menyimpan password.
 
-## Data pengujian
+## Program studi data dummy
 
-| Username | Prodi | Tagihan | Hasil ujian TI |
+| Kode | Program studi |
+|---|---|
+| `MKEP` | Magister Keperawatan |
+| `KESMAS` | Kesehatan Masyarakat |
+| `MP` | Manajemen Pendidikan |
+| `HUKUM` | Hukum |
+
+## Data pengujian utama
+
+| Username | Program studi/status | Kondisi tagihan | Hasil yang diharapkan |
 |---|---|---|---|
-| `mhs001` | TI | lunas | dapat mengakses |
-| `mhs002` | TI | belum_lunas | diblokir |
-| `mhs003` | SI | lunas | diblokir untuk TI, dapat untuk SI |
-| `dsn001` | TI | n/a | mendapat role kategori setelah Prodi dipetakan |
+| `mhs001` | Magister Keperawatan, aktif | UKT lunas | dapat mengikuti ujian MKEP |
+| `mhs002` | Magister Keperawatan, aktif | UKT belum lunas | ditolak |
+| `mhs003` | Kesehatan Masyarakat, aktif | UKT lunas | ditolak untuk MKEP, diizinkan untuk KESMAS |
+| `mhs004` | Magister Keperawatan, aktif | UKT lunas dan praktikum wajib belum lunas | ditolak bila semua jenis tagihan diperiksa |
+| `mhs005` | Magister Keperawatan, aktif | UKT lunas dan tagihan opsional belum lunas | diizinkan |
+| `mhs006` | Magister Keperawatan, cuti | UKT lunas | ditolak karena tidak aktif |
+| `mhs007` | Magister Keperawatan, aktif | tagihan hanya semester ganjil | ditolak untuk semester genap |
+| `mhs008` | Magister Keperawatan, aktif | tagihan wajib dibatalkan | ditolak karena tidak ada tagihan wajib aktif |
+| `mhs009` | Manajemen Pendidikan, aktif | UKT lunas | diizinkan untuk MP, ditolak untuk HUKUM |
+| `mhs010` | Magister Keperawatan, aktif | tidak memiliki tagihan | ditolak |
+| `mhs011` | Hukum, aktif | UKT lunas | diizinkan untuk HUKUM, ditolak untuk KESMAS |
 
-Buat user Moodle dengan username yang sama untuk pengujian dummy. Pemetaan tidak bergantung pada password SIAKAD.
+Akun dosen dummy tersedia sebagai `dsn001` sampai `dsn004`, masing-masing untuk MKEP, KESMAS, MP, dan HUKUM. Password bawaan hanya untuk akun baru yang dibuat seeder: `Dummy#2026!`.
 
 ## Pengaturan admin
 
@@ -164,16 +180,16 @@ Endpoint harus mengembalikan HTTP 2xx dan JSON berikut. Properti dapat dibungkus
 ```json
 {
   "prodi": [
-    {"id":"10","kode":"TI","nama":"Teknologi Informasi","aktif":true,"categoryid":12}
+    {"id":"10","kode":"MKEP","nama":"Magister Keperawatan","aktif":true,"categoryid":12}
   ],
   "users": [
     {"id":"7001","username":"mhs001","fullname":"Mahasiswa Satu","email":"mhs001@kampus.ac.id","role":"mahasiswa"}
   ],
   "mahasiswa": [
-    {"id":"mhs-1","username":"mhs001","nim":"240001","nama":"Mahasiswa Satu","email":"mhs001@kampus.ac.id","prodi":"TI","status":"aktif"}
+    {"id":"mhs-1","username":"mhs001","nim":"240001","nama":"Mahasiswa Satu","email":"mhs001@kampus.ac.id","prodi":"MKEP","status":"aktif"}
   ],
   "dosen": [
-    {"id":"dsn-1","username":"dsn001","nidn":"001001","nama":"Dosen Satu","email":"dsn001@kampus.ac.id","prodi":"TI","status":"aktif"}
+    {"id":"dsn-1","username":"dsn001","nidn":"001001","nama":"Dosen Satu","email":"dsn001@kampus.ac.id","prodi":"MKEP","status":"aktif"}
   ],
   "tagihan": [
     {"id":"bill-1","nim":"240001","kodetagihan":"UKT-2026-GENAP-240001","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true,"paidat":"2026-07-17T10:00:00+07:00"}
@@ -217,6 +233,19 @@ Pada server Linux, jalankan cron Moodle setiap menit; task SIAKAD sendiri dijadw
 
 ## Pengujian
 
+Verifikasi dummy lokal:
+
+```bat
+D:\laragon\bin\php\php-8.4.6-Win32-vs17-x64\php.exe public\local\siakadbridge\cli\verify_dummy.php
+```
+
+Hasil yang diharapkan:
+
+```text
+Summary: 15 passed, 0 failed.
+All dummy exam-access scenarios behave as expected.
+```
+
 PHPUnit plugin:
 
 ```bat
@@ -224,7 +253,7 @@ vendor\bin\phpunit --testsuite local_siakadbridge_testsuite
 vendor\bin\phpunit --testsuite availability_siakadpaid_testsuite
 ```
 
-Pengujian mencakup mahasiswa lunas, belum lunas, salah Prodi, beberapa tagihan wajib, tagihan opsional, tagihan dibatalkan, serialisasi kondisi, impor REST idempoten, migrasi ID dummy ke ID sumber nyata, integrasi mapping `local_pascasync`, pelestarian waktu pembayaran/pemetaan kategori, dan pembersihan cohort mahasiswa nonaktif.
+Pengujian mencakup mahasiswa lunas, belum lunas, salah Prodi pada beberapa kombinasi MKEP/KESMAS/MP/HUKUM, beberapa tagihan wajib, tagihan opsional, tagihan dibatalkan, serialisasi kondisi, impor REST idempoten, migrasi ID dummy ke ID sumber nyata, integrasi mapping `local_pascasync`, pelestarian waktu pembayaran/pemetaan kategori, dan pembersihan cohort mahasiswa nonaktif.
 
 ## Batas integrasi nyata
 
