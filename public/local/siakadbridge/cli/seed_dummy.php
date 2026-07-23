@@ -23,6 +23,12 @@ if ($options['help']) {
     cli_writeln(<<<'HELP'
 Seed local dummy SIAKAD data for exam-access testing.
 
+Programs:
+- MKEP: Magister Keperawatan
+- KESMAS: Kesehatan Masyarakat
+- MP: Manajemen Pendidikan
+- HUKUM: Hukum
+
 Options:
 --create-moodle-users, -u  Create missing Moodle accounts for all dummy users.
 --password, -p              Password for newly created Moodle accounts.
@@ -48,37 +54,46 @@ if ($options['reset']) {
 $payload = json_decode(<<<'JSON'
 {
   "prodi": [
-    {"id":"prodi-ti","kode":"TI","nama":"Teknologi Informasi","aktif":true},
-    {"id":"prodi-si","kode":"SI","nama":"Sistem Informasi","aktif":true},
-    {"id":"prodi-mnj","kode":"MNJ","nama":"Manajemen","aktif":true}
+    {"id":"prodi-mkep","kode":"MKEP","nama":"Magister Keperawatan","aktif":true},
+    {"id":"prodi-kesmas","kode":"KESMAS","nama":"Kesehatan Masyarakat","aktif":true},
+    {"id":"prodi-mp","kode":"MP","nama":"Manajemen Pendidikan","aktif":true},
+    {"id":"prodi-hukum","kode":"HUKUM","nama":"Hukum","aktif":true}
   ],
   "users": [
-    {"id":"user-mhs001","username":"mhs001","fullname":"Mahasiswa Lunas TI","email":"mhs001@example.test","role":"mahasiswa"},
-    {"id":"user-mhs002","username":"mhs002","fullname":"Mahasiswa Belum Lunas TI","email":"mhs002@example.test","role":"mahasiswa"},
-    {"id":"user-mhs003","username":"mhs003","fullname":"Mahasiswa Lunas SI","email":"mhs003@example.test","role":"mahasiswa"},
-    {"id":"user-mhs004","username":"mhs004","fullname":"Mahasiswa Tagihan Ganda TI","email":"mhs004@example.test","role":"mahasiswa"},
-    {"id":"user-mhs005","username":"mhs005","fullname":"Mahasiswa Tagihan Opsional TI","email":"mhs005@example.test","role":"mahasiswa"},
-    {"id":"user-mhs006","username":"mhs006","fullname":"Mahasiswa Cuti TI","email":"mhs006@example.test","role":"mahasiswa"},
-    {"id":"user-mhs007","username":"mhs007","fullname":"Mahasiswa Periode Berbeda TI","email":"mhs007@example.test","role":"mahasiswa"},
-    {"id":"user-mhs008","username":"mhs008","fullname":"Mahasiswa Tagihan Dibatalkan TI","email":"mhs008@example.test","role":"mahasiswa"},
-    {"id":"user-mhs009","username":"mhs009","fullname":"Mahasiswa Lunas Manajemen","email":"mhs009@example.test","role":"mahasiswa"},
-    {"id":"user-mhs010","username":"mhs010","fullname":"Mahasiswa Tanpa Tagihan TI","email":"mhs010@example.test","role":"mahasiswa"},
-    {"id":"user-dsn001","username":"dsn001","fullname":"Dosen Teknologi Informasi","email":"dsn001@example.test","role":"dosen"}
+    {"id":"user-mhs001","username":"mhs001","fullname":"Mahasiswa Lunas Magister Keperawatan","email":"mhs001@example.test","role":"mahasiswa"},
+    {"id":"user-mhs002","username":"mhs002","fullname":"Mahasiswa Belum Lunas Magister Keperawatan","email":"mhs002@example.test","role":"mahasiswa"},
+    {"id":"user-mhs003","username":"mhs003","fullname":"Mahasiswa Lunas Kesehatan Masyarakat","email":"mhs003@example.test","role":"mahasiswa"},
+    {"id":"user-mhs004","username":"mhs004","fullname":"Mahasiswa Tagihan Ganda Magister Keperawatan","email":"mhs004@example.test","role":"mahasiswa"},
+    {"id":"user-mhs005","username":"mhs005","fullname":"Mahasiswa Tagihan Opsional Magister Keperawatan","email":"mhs005@example.test","role":"mahasiswa"},
+    {"id":"user-mhs006","username":"mhs006","fullname":"Mahasiswa Cuti Magister Keperawatan","email":"mhs006@example.test","role":"mahasiswa"},
+    {"id":"user-mhs007","username":"mhs007","fullname":"Mahasiswa Periode Berbeda Magister Keperawatan","email":"mhs007@example.test","role":"mahasiswa"},
+    {"id":"user-mhs008","username":"mhs008","fullname":"Mahasiswa Tagihan Dibatalkan Magister Keperawatan","email":"mhs008@example.test","role":"mahasiswa"},
+    {"id":"user-mhs009","username":"mhs009","fullname":"Mahasiswa Lunas Manajemen Pendidikan","email":"mhs009@example.test","role":"mahasiswa"},
+    {"id":"user-mhs010","username":"mhs010","fullname":"Mahasiswa Tanpa Tagihan Magister Keperawatan","email":"mhs010@example.test","role":"mahasiswa"},
+    {"id":"user-mhs011","username":"mhs011","fullname":"Mahasiswa Lunas Hukum","email":"mhs011@example.test","role":"mahasiswa"},
+    {"id":"user-dsn001","username":"dsn001","fullname":"Dosen Magister Keperawatan","email":"dsn001@example.test","role":"dosen"},
+    {"id":"user-dsn002","username":"dsn002","fullname":"Dosen Kesehatan Masyarakat","email":"dsn002@example.test","role":"dosen"},
+    {"id":"user-dsn003","username":"dsn003","fullname":"Dosen Manajemen Pendidikan","email":"dsn003@example.test","role":"dosen"},
+    {"id":"user-dsn004","username":"dsn004","fullname":"Dosen Hukum","email":"dsn004@example.test","role":"dosen"}
   ],
   "mahasiswa": [
-    {"id":"student-240001","username":"mhs001","nim":"240001","nama":"Mahasiswa Lunas TI","email":"mhs001@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240002","username":"mhs002","nim":"240002","nama":"Mahasiswa Belum Lunas TI","email":"mhs002@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240003","username":"mhs003","nim":"240003","nama":"Mahasiswa Lunas SI","email":"mhs003@example.test","prodi":"SI","status":"aktif"},
-    {"id":"student-240004","username":"mhs004","nim":"240004","nama":"Mahasiswa Tagihan Ganda TI","email":"mhs004@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240005","username":"mhs005","nim":"240005","nama":"Mahasiswa Tagihan Opsional TI","email":"mhs005@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240006","username":"mhs006","nim":"240006","nama":"Mahasiswa Cuti TI","email":"mhs006@example.test","prodi":"TI","status":"cuti"},
-    {"id":"student-240007","username":"mhs007","nim":"240007","nama":"Mahasiswa Periode Berbeda TI","email":"mhs007@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240008","username":"mhs008","nim":"240008","nama":"Mahasiswa Tagihan Dibatalkan TI","email":"mhs008@example.test","prodi":"TI","status":"aktif"},
-    {"id":"student-240009","username":"mhs009","nim":"240009","nama":"Mahasiswa Lunas Manajemen","email":"mhs009@example.test","prodi":"MNJ","status":"aktif"},
-    {"id":"student-240010","username":"mhs010","nim":"240010","nama":"Mahasiswa Tanpa Tagihan TI","email":"mhs010@example.test","prodi":"TI","status":"aktif"}
+    {"id":"student-240001","username":"mhs001","nim":"240001","nama":"Mahasiswa Lunas Magister Keperawatan","email":"mhs001@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240002","username":"mhs002","nim":"240002","nama":"Mahasiswa Belum Lunas Magister Keperawatan","email":"mhs002@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240003","username":"mhs003","nim":"240003","nama":"Mahasiswa Lunas Kesehatan Masyarakat","email":"mhs003@example.test","prodi":"KESMAS","status":"aktif"},
+    {"id":"student-240004","username":"mhs004","nim":"240004","nama":"Mahasiswa Tagihan Ganda Magister Keperawatan","email":"mhs004@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240005","username":"mhs005","nim":"240005","nama":"Mahasiswa Tagihan Opsional Magister Keperawatan","email":"mhs005@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240006","username":"mhs006","nim":"240006","nama":"Mahasiswa Cuti Magister Keperawatan","email":"mhs006@example.test","prodi":"MKEP","status":"cuti"},
+    {"id":"student-240007","username":"mhs007","nim":"240007","nama":"Mahasiswa Periode Berbeda Magister Keperawatan","email":"mhs007@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240008","username":"mhs008","nim":"240008","nama":"Mahasiswa Tagihan Dibatalkan Magister Keperawatan","email":"mhs008@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240009","username":"mhs009","nim":"240009","nama":"Mahasiswa Lunas Manajemen Pendidikan","email":"mhs009@example.test","prodi":"MP","status":"aktif"},
+    {"id":"student-240010","username":"mhs010","nim":"240010","nama":"Mahasiswa Tanpa Tagihan Magister Keperawatan","email":"mhs010@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"student-240011","username":"mhs011","nim":"240011","nama":"Mahasiswa Lunas Hukum","email":"mhs011@example.test","prodi":"HUKUM","status":"aktif"}
   ],
   "dosen": [
-    {"id":"lecturer-001001","username":"dsn001","nidn":"001001","nama":"Dosen Teknologi Informasi","email":"dsn001@example.test","prodi":"TI","status":"aktif"}
+    {"id":"lecturer-001001","username":"dsn001","nidn":"001001","nama":"Dosen Magister Keperawatan","email":"dsn001@example.test","prodi":"MKEP","status":"aktif"},
+    {"id":"lecturer-001002","username":"dsn002","nidn":"001002","nama":"Dosen Kesehatan Masyarakat","email":"dsn002@example.test","prodi":"KESMAS","status":"aktif"},
+    {"id":"lecturer-001003","username":"dsn003","nidn":"001003","nama":"Dosen Manajemen Pendidikan","email":"dsn003@example.test","prodi":"MP","status":"aktif"},
+    {"id":"lecturer-001004","username":"dsn004","nidn":"001004","nama":"Dosen Hukum","email":"dsn004@example.test","prodi":"HUKUM","status":"aktif"}
   ],
   "tagihan": [
     {"id":"bill-240001-ukt","nim":"240001","kodetagihan":"UKT-2026-GENAP-240001","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true},
@@ -91,7 +106,8 @@ $payload = json_decode(<<<'JSON'
     {"id":"bill-240006-ukt","nim":"240006","kodetagihan":"UKT-2026-GENAP-240006","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true},
     {"id":"bill-240007-ukt","nim":"240007","kodetagihan":"UKT-2026-GANJIL-240007","tahunajaran":"2026/2027","semester":"ganjil","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true},
     {"id":"bill-240008-ukt","nim":"240008","kodetagihan":"UKT-2026-GENAP-240008","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"dibatalkan","wajib":true},
-    {"id":"bill-240009-ukt","nim":"240009","kodetagihan":"UKT-2026-GENAP-240009","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true}
+    {"id":"bill-240009-ukt","nim":"240009","kodetagihan":"UKT-2026-GENAP-240009","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true},
+    {"id":"bill-240011-ukt","nim":"240011","kodetagihan":"UKT-2026-GENAP-240011","tahunajaran":"2026/2027","semester":"genap","jenis":"UKT","nominal":2500000,"status":"lunas","wajib":true}
   ]
 }
 JSON
@@ -140,12 +156,26 @@ if ($options['create-moodle-users']) {
 }
 
 $result = \local_siakadbridge\sync\service::import_payload($payload, 'dummy');
+
+// Remove only obsolete program rows from the previous dummy dataset. Real data is never matched here.
+$legacycodes = ['prodi-ti', 'prodi-si', 'prodi-mnj'];
+$legacyremoved = 0;
+foreach ($DB->get_records_list('local_siakad_prodi', 'sourceid', $legacycodes) as $legacyprodi) {
+    $inuse = $DB->record_exists('local_siakad_mahasiswa', ['prodiid' => $legacyprodi->id])
+        || $DB->record_exists('local_siakad_dosen', ['prodiid' => $legacyprodi->id]);
+    if (!$inuse) {
+        $DB->delete_records('local_siakad_prodi', ['id' => $legacyprodi->id]);
+        $legacyremoved++;
+    }
+}
+
 set_config('currentyear', '2026/2027', 'local_siakadbridge');
 set_config('currentsemester', 'genap', 'local_siakadbridge');
 set_config('gatemode', 'all_required_lunas', 'local_siakadbridge');
 $reconciled = \local_siakadbridge\manager::reconcile_moodle_access();
 
 cli_writeln(sprintf('Dummy SIAKAD data seeded: %d inserted, %d updated.', $result->inserted, $result->updated));
+cli_writeln(sprintf('Obsolete legacy dummy programs removed: %d.', $legacyremoved));
 cli_writeln(sprintf(
     'Moodle reconciliation: %d identities linked, %d student cohort memberships added, %d lecturer roles assigned.',
     $reconciled->linked,
