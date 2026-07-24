@@ -82,8 +82,13 @@ class quizaccess_siakad extends quiz_access_rule_base {
         }
 
         $first = reset($records);
+        $prodiids = [];
+        foreach ($records as $record) {
+            $prodiids[] = (int) $record->prodiid;
+        }
+
         return [
-            'siakadprodiids' => array_map('intval', array_column($records, 'prodiid')),
+            'siakadprodiids' => $prodiids,
             'siakadperiod' => $first->period,
             'siakadrequirepaid' => (int) $first->requirepaid,
         ];
