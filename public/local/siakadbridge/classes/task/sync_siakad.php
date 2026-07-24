@@ -5,7 +5,7 @@ namespace local_siakadbridge\task;
 
 defined('MOODLE_INTERNAL') || die();
 
-/** Scheduled SIAKAD synchronisation. */
+/** Scheduled combined SIAKAD synchronisation. */
 final class sync_siakad extends \core\task\scheduled_task {
     public function get_name(): string {
         return get_string('task_sync', 'local_siakadbridge');
@@ -14,6 +14,10 @@ final class sync_siakad extends \core\task\scheduled_task {
     public function execute(): void {
         if ((string) get_config('local_siakadbridge', 'sourcemode') !== 'rest') {
             mtrace('SIAKAD bridge is in manual mode; nothing to synchronise.');
+            return;
+        }
+        if (trim((string) get_config('local_siakadbridge', 'apiurl')) === '') {
+            mtrace('No combined SIAKAD endpoint is configured; only dedicated endpoint tasks will run.');
             return;
         }
         try {
