@@ -7,7 +7,7 @@
 // (at your option) any later version.
 
 /**
- * Version information for the Pasca Prodi automation plugin.
+ * Version information for the Study Program automation plugin.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -17,7 +17,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_pascaprodi';
-$plugin->version = 2026071608;
+$plugin->version = 2026072401;
 $plugin->requires = 2026042000;
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '1.7.0';
+$plugin->maturity = MATURITY_BETA;
+$plugin->release = '1.8.0';
