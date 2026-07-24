@@ -9,7 +9,22 @@ require_capability('local/siakadbridge:sync', context_system::instance());
 $run = optional_param('run', 0, PARAM_BOOL);
 if ($run && confirm_sesskey()) {
     try {
-        $result = \local_siakadbridge\sync\service::run();
+        $result = (object) ['inserted' => 0, 'updated' => 0, 'failed' => 0];
+
+        if (trim((string) get_config('local_siakadbridge', 'programapiurl')) !== '') {
+            $programresult = \local_siakadbridge\sync\program_study_service::run();
+            $result->inserted += (int) $programresult->inserted;
+            $result->updated += (int) $programresult->updated;
+            $result->failed += (int) $programresult->failed;
+        }
+
+        if (trim((string) get_config('local_siakadbridge', 'apiurl')) !== '') {
+            $combinedresult = \local_siakadbridge\sync\service::run();
+            $result->inserted += (int) $combinedresult->inserted;
+            $result->updated += (int) $combinedresult->updated;
+            $result->failed += (int) $combinedresult->failed;
+        }
+
         redirect(new moodle_url('/local/siakadbridge/sync.php'), get_string('syncsuccess', 'local_siakadbridge', $result));
     } catch (Throwable $exception) {
         redirect(
