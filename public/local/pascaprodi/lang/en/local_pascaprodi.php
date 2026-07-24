@@ -73,6 +73,7 @@ $string['apisyncinvaliddata'] = 'API response does not contain a valid study-pro
 $string['categoryid'] = 'Category ID';
 $string['cohortid'] = 'Cohort ID';
 $string['syncmessage'] = 'Message';
+$string['task_sync_remote_categories'] = 'Synchronise all UNW Study Program categories';
 $string['error_select_role_or_category'] = 'Select at least an access role or a Study Program/Category.';
 $string['error_accessrole_required'] = 'Access role is required.';
 $string['error_categories_required'] = 'Study Program/Category is required.';
