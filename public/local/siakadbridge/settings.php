@@ -20,6 +20,37 @@ if ($hassiteconfig) {
             'rest' => get_string('source_rest', 'local_siakadbridge'),
         ]
     ));
+
+    $settings->add(new admin_setting_heading(
+        'local_siakadbridge/programapiheading',
+        get_string('programapiheading', 'local_siakadbridge'),
+        get_string('programapiheading_desc', 'local_siakadbridge')
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_siakadbridge/programapiurl',
+        get_string('programapiurl', 'local_siakadbridge'),
+        get_string('programapiurl_desc', 'local_siakadbridge'),
+        'https://panel-web.unw.ac.id/api/unw-program-studi',
+        PARAM_URL
+    ));
+    $settings->add(new admin_setting_configpasswordunmask(
+        'local_siakadbridge/programapitoken',
+        get_string('programapitoken', 'local_siakadbridge'),
+        get_string('programapitoken_desc', 'local_siakadbridge'),
+        ''
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_siakadbridge/programapifullsnapshot',
+        get_string('programapifullsnapshot', 'local_siakadbridge'),
+        get_string('programapifullsnapshot_desc', 'local_siakadbridge'),
+        0
+    ));
+
+    $settings->add(new admin_setting_heading(
+        'local_siakadbridge/combinedapiheading',
+        get_string('combinedapiheading', 'local_siakadbridge'),
+        get_string('combinedapiheading_desc', 'local_siakadbridge')
+    ));
     $settings->add(new admin_setting_configtext(
         'local_siakadbridge/apiurl',
         get_string('apiurl', 'local_siakadbridge'),
