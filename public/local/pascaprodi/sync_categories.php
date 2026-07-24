@@ -7,7 +7,7 @@
 // (at your option) any later version.
 
 /**
- * Sync Magister Program Studi from UNW API into Moodle root course categories.
+ * Sync all Program Studi from the UNW API into Moodle root course categories.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -36,7 +36,7 @@ $error = null;
 if ($dosync) {
     require_sesskey();
     try {
-        $result = \local_pascaprodi\manager::sync_remote_magister_categories();
+        $result = \local_pascaprodi\category_sync_service::run();
     } catch (Throwable $exception) {
         $error = $exception->getMessage();
     }
