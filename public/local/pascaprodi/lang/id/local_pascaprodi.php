@@ -73,6 +73,7 @@ $string['apisyncinvaliddata'] = 'Response API tidak memiliki daftar Program Stud
 $string['categoryid'] = 'ID kategori';
 $string['cohortid'] = 'ID cohort';
 $string['syncmessage'] = 'Pesan';
+$string['task_sync_remote_categories'] = 'Sinkronisasi seluruh kategori Program Studi UNW';
 $string['error_select_role_or_category'] = 'Pilih minimal role akses atau Program Studi/Kategori.';
 $string['error_accessrole_required'] = 'Role akses wajib dipilih.';
 $string['error_categories_required'] = 'Program Studi/Kategori wajib dipilih.';
