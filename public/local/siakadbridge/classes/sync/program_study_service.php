@@ -51,6 +51,9 @@ final class program_study_service {
             if ((bool) get_config('local_siakadbridge', 'programapifullsnapshot')) {
                 $deactivated = self::deactivate_missing($programs);
                 $result->updated += $deactivated;
+                if ($deactivated > 0) {
+                    \local_siakadbridge\manager::reconcile_moodle_access();
+                }
             }
             $result->message = sprintf(
                 'Study-program API synchronised: %d active/incoming records, %d missing records deactivated.',
