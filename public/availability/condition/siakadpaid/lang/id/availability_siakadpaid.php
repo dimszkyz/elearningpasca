@@ -2,6 +2,7 @@
 // This file is part of Moodle - http://moodle.org/
 $string['pluginname'] = 'Tagihan dan program studi SIAKAD';
 $string['title'] = 'Tagihan dan program studi SIAKAD';
+$string['description'] = 'Batasi akses berdasarkan program studi mahasiswa, periode akademik, dan status tagihan SIAKAD.';
 $string['label_prodi'] = 'Program studi';
 $string['label_tahunajaran'] = 'Tahun ajaran';
 $string['label_semester'] = 'Semester';
