@@ -1,0 +1,5 @@
+{
+  "moodle-availability_siakadpaid-form": {
+    "requires": ["base", "node", "event", "escape", "moodle-core_availability-form"]
+  }
+}
