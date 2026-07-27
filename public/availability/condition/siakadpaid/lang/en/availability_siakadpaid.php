@@ -2,6 +2,7 @@
 // This file is part of Moodle - http://moodle.org/
 $string['pluginname'] = 'SIAKAD billing and study program';
 $string['title'] = 'SIAKAD billing and study program';
+$string['description'] = 'Restrict access using the student study program, academic period, and SIAKAD billing status.';
 $string['label_prodi'] = 'Study program';
 $string['label_tahunajaran'] = 'Academic year';
 $string['label_semester'] = 'Semester';
