@@ -191,10 +191,10 @@ if ($userform->is_cancelled()) {
     if ((int) $usernew->id === -1 && class_exists('\\local_pascaprodi\\user_setup')) {
         $pascaprodidata = [
             'roleid' => (int) ($usernew->pascaprodi_roleid ?? 0),
-            'categoryids' => \local_pascaprodi\user_setup::normalise_category_ids($usernew->pascaprodi_categoryids ?? []),
+            'prodiids' => \local_pascaprodi\user_setup::normalise_prodi_ids($usernew->pascaprodi_prodiids ?? []),
         ];
     }
-    unset($usernew->pascaprodi_roleid, $usernew->pascaprodi_categoryids);
+    unset($usernew->pascaprodi_roleid, $usernew->pascaprodi_prodiids);
 
     if ($usernew->id == -1) {
         unset($usernew->id);
@@ -219,7 +219,7 @@ if ($userform->is_cancelled()) {
             \local_pascaprodi\user_setup::apply(
                 (int) $usernew->id,
                 (int) $pascaprodidata['roleid'],
-                (array) $pascaprodidata['categoryids']
+                (array) $pascaprodidata['prodiids']
             );
         }
 

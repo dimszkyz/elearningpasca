@@ -7,17 +7,23 @@
 // (at your option) any later version.
 
 /**
- * Version information for the Pasca Prodi automation plugin.
+ * Scheduled tasks for local_siakad.
  *
- * @package    local_pascaprodi
+ * @package    local_siakad
  * @copyright  2026
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_pascaprodi';
-$plugin->version = 2026072900;
-$plugin->requires = 2026042000;
-$plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '2.0.0';
+$tasks = [
+    [
+        'classname' => 'local_siakad\\task\\sync_prodi_task',
+        'blocking' => 0,
+        'minute' => '15',
+        'hour' => '*/6',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*',
+    ],
+];

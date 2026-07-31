@@ -11,7 +11,13 @@ namespace local_pascaprodi;
 use stdClass;
 
 /**
- * Prodi category cohort automation service.
+ * Study programme service.
+ *
+ * Programmes live in {local_pascaprodi_prodi}, not in course categories. Each
+ * programme owns one generated student cohort, and a course is linked to a
+ * programme by attaching that cohort as a Cohort sync enrolment method. Course
+ * categories are therefore free to model whatever content structure the site
+ * wants.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -21,20 +27,28 @@ final class manager {
     /** Plugin component name. */
     public const COMPONENT = 'local_pascaprodi';
 
+    /** Programme table. */
+    public const TABLE_PRODI = 'local_pascaprodi_prodi';
+
     /** Student cohort type. */
     public const TYPE_STUDENT = 'student';
 
-    /** Stable idnumber prefix linking generated student cohorts to course categories. */
-    public const STUDENT_IDNUMBER_PREFIX = 'pasca:prodi-category:';
+    /** Stable idnumber prefix linking generated student cohorts to programmes. */
+    public const PRODI_IDNUMBER_PREFIX = 'pasca:prodi:';
+
+    /**
+     * Cohort idnumber prefix used while programmes were course categories.
+     *
+     * Kept so cli/migrate_prodi_categories.php can find the old cohorts and
+     * re-key them. Nothing on the runtime path should use it.
+     */
+    public const LEGACY_CATEGORY_IDNUMBER_PREFIX = 'pasca:prodi-category:';
 
     /** Old teacher cohort prefix from version 1.1.0. Kept only for cleanup. */
     private const OLD_TEACHER_IDNUMBER_PREFIX = 'pasca:prodi-category-teacher:';
 
     /** Default API URL for UNW study programs. */
     public const DEFAULT_API_URL = 'https://panel-web.unw.ac.id/api/unw-program-studi';
-
-    /** Only this jenjang is synced into Moodle course categories. */
-    private const SYNC_JENJANG = 'magister';
 
     /**
      * Check whether automation is enabled.
@@ -44,28 +58,21 @@ final class manager {
     }
 
     /**
-     * Check whether generated cohort names should follow category name changes.
+     * Check whether generated cohort names should follow programme name changes.
      */
     public static function should_update_names(): bool {
         return (bool) get_config(self::COMPONENT, 'updatenames');
     }
 
     /**
-     * Check whether generated cohorts should be archived on category deletion.
+     * Check whether generated cohorts should be archived when a programme is dropped.
      */
     public static function should_archive_deleted(): bool {
         return (bool) get_config(self::COMPONENT, 'archiveondeleted');
     }
 
     /**
-     * Check whether student cohorts should be automatically linked to new courses.
-     */
-    public static function should_autoenrol_students(): bool {
-        return (bool) get_config(self::COMPONENT, 'autoenrolstudents');
-    }
-
-    /**
-     * Return configured API URL for category sync.
+     * Return configured API URL for the programme sync.
      */
     public static function get_sync_api_url(): string {
         $url = get_config(self::COMPONENT, 'syncapiurl');
@@ -82,133 +89,104 @@ final class manager {
     }
 
     /**
-     * Determine whether a role should be assigned at Prodi/category context.
-     *
-     * Student-like roles are handled through the generated student cohort instead.
-     * Teacher, lecturer, course creator, manager, and custom globalteacher roles can
-     * be assigned to one or more selected Prodi categories.
+     * Build the stable generated student cohort idnumber for a programme.
      */
-    public static function is_category_role(stdClass $role): bool {
-        $shortname = strtolower((string) ($role->shortname ?? ''));
-        $name = strtolower((string) ($role->name ?? ''));
-        $archetype = strtolower((string) ($role->archetype ?? ''));
-        $text = $shortname . ' ' . $name . ' ' . $archetype;
-
-        $keywords = [
-            'teacher',
-            'globalteacher',
-            'grandteacher',
-            'editingteacher',
-            'lecturer',
-            'dosen',
-            'coursecreator',
-            'creator',
-            'manager',
-        ];
-
-        foreach ($keywords as $keyword) {
-            if (strpos($text, $keyword) !== false) {
-                return true;
-            }
-        }
-
-        return false;
+    public static function cohort_idnumber(int $prodiid): string {
+        return self::PRODI_IDNUMBER_PREFIX . $prodiid;
     }
 
     /**
-     * Build the stable generated student cohort idnumber for a category.
+     * Create or update the student cohort linked to a programme.
      */
-    public static function cohort_idnumber(int $categoryid): string {
-        return self::STUDENT_IDNUMBER_PREFIX . $categoryid;
-    }
-
-    /**
-     * Create or update the student cohort linked to a course category.
-     */
-    public static function ensure_category_cohort(int $categoryid): ?int {
+    public static function ensure_prodi_cohort(int $prodiid): ?int {
         global $CFG, $DB;
 
-        if ($categoryid <= 0) {
+        if ($prodiid <= 0) {
             return null;
         }
 
-        $category = $DB->get_record('course_categories', ['id' => $categoryid]);
-        if (!$category) {
+        $prodi = $DB->get_record(self::TABLE_PRODI, ['id' => $prodiid]);
+        if (!$prodi) {
             return null;
         }
 
         require_once($CFG->dirroot . '/cohort/lib.php');
 
-        $idnumber = self::cohort_idnumber($categoryid);
-        $name = self::cohort_name((string) $category->name);
-        $description = self::cohort_description((string) $category->name);
+        $idnumber = self::cohort_idnumber($prodiid);
+        $name = self::cohort_name((string) $prodi->name);
+        $description = self::cohort_description((string) $prodi->name);
         $systemcontext = \context_system::instance();
         $now = time();
 
         $cohort = $DB->get_record('cohort', ['idnumber' => $idnumber]);
         if ($cohort) {
             $cohort->contextid = $systemcontext->id;
-            $cohort->name = $name;
-            $cohort->description = $description;
-            $cohort->descriptionformat = FORMAT_HTML;
+            if (self::should_update_names()) {
+                $cohort->name = $name;
+                $cohort->description = $description;
+                $cohort->descriptionformat = FORMAT_HTML;
+            }
             $cohort->visible = 1;
             // Empty component keeps the cohort editable/assignable from Moodle UI.
             $cohort->component = '';
             $cohort->timemodified = $now;
             cohort_update_cohort($cohort);
-            return (int) $cohort->id;
+            $cohortid = (int) $cohort->id;
+        } else {
+            $cohort = (object) [
+                'contextid' => $systemcontext->id,
+                'name' => $name,
+                'idnumber' => $idnumber,
+                'description' => $description,
+                'descriptionformat' => FORMAT_HTML,
+                'visible' => 1,
+                // Empty component keeps the cohort editable/assignable from Moodle UI.
+                'component' => '',
+            ];
+            $cohortid = (int) cohort_add_cohort($cohort);
         }
 
-        $cohort = (object) [
-            'contextid' => $systemcontext->id,
-            'name' => $name,
-            'idnumber' => $idnumber,
-            'description' => $description,
-            'descriptionformat' => FORMAT_HTML,
-            'visible' => 1,
-            // Empty component keeps the cohort editable/assignable from Moodle UI.
-            'component' => '',
-        ];
+        if ((int) $prodi->cohortid !== $cohortid) {
+            $DB->set_field(self::TABLE_PRODI, 'cohortid', $cohortid, ['id' => $prodiid]);
+        }
 
-        return (int) cohort_add_cohort($cohort);
+        return $cohortid;
     }
 
     /**
-     * Compatibility wrapper for code that expects a plural method.
+     * Archive the generated student cohort of a programme.
      *
-     * @return array{student:int|null}
+     * The cohort is hidden and renamed rather than deleted, so its members and any
+     * historical enrolments keep resolving.
      */
-    public static function ensure_category_cohorts(int $categoryid): array {
-        return [
-            self::TYPE_STUDENT => self::ensure_category_cohort($categoryid),
-        ];
-    }
-
-    /**
-     * Archive generated student cohort when a category is deleted.
-     */
-    public static function archive_category_cohort(int $categoryid, string $categoryname = ''): void {
+    public static function archive_prodi_cohort(int $prodiid, string $prodiname = ''): void {
         global $CFG, $DB;
 
-        if ($categoryid <= 0) {
+        if ($prodiid <= 0) {
             return;
         }
 
-        $cohort = $DB->get_record('cohort', ['idnumber' => self::cohort_idnumber($categoryid)]);
+        $cohort = $DB->get_record('cohort', ['idnumber' => self::cohort_idnumber($prodiid)]);
         if (!$cohort) {
             return;
         }
 
         require_once($CFG->dirroot . '/cohort/lib.php');
 
-        $basename = $categoryname !== ''
-            ? $categoryname
+        $prefix = self::archive_prefix();
+        if (strpos((string) $cohort->name, $prefix) === 0) {
+            // Already archived by an earlier sync run.
+            return;
+        }
+
+        $basename = $prodiname !== ''
+            ? $prodiname
             : preg_replace('/^' . preg_quote(self::cohort_name_prefix(), '/') . '/', '', $cohort->name);
-        $cohort->name = self::archive_prefix() . self::cohort_name((string) $basename);
+        $cohort->name = $prefix . self::cohort_name((string) $basename);
         $cohort->visible = 0;
         $cohort->description = get_string('cohortarchiveddescription', self::COMPONENT, (object) [
-            'categoryid' => $categoryid,
-            'categoryname' => $categoryname !== '' ? $categoryname : $cohort->name,
+            'prodiid' => $prodiid,
+            'prodiname' => $prodiname !== '' ? $prodiname : $basename,
         ]);
         $cohort->descriptionformat = FORMAT_HTML;
         $cohort->timemodified = time();
@@ -216,46 +194,13 @@ final class manager {
     }
 
     /**
-     * Synchronise generated student cohorts for all existing course categories.
+     * Fetch the UNW Program Studi API and sync every record into the programme table.
      *
-     * @return array{created:int,updated:int,skipped:int}
+     * @return array{created:int,updated:int,unchanged:int,skipped:int,failed:int,deactivated:int,cohortcreated:int,cohortupdated:int,items:array<int,array<string,string|int>>}
      */
-    public static function sync_all_categories(): array {
-        global $DB;
-
-        $result = [
-            'created' => 0,
-            'updated' => 0,
-            'skipped' => 0,
-        ];
-
-        $categories = $DB->get_records('course_categories', null, 'sortorder ASC', 'id,name');
-        foreach ($categories as $category) {
-            $idnumber = self::cohort_idnumber((int) $category->id);
-            $exists = $DB->record_exists('cohort', ['idnumber' => $idnumber]);
-            $cohortid = self::ensure_category_cohort((int) $category->id);
-
-            if (!$cohortid) {
-                $result['skipped']++;
-            } else if ($exists) {
-                $result['updated']++;
-            } else {
-                $result['created']++;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Fetch UNW Program Studi API and sync Magister records as root Moodle categories.
-     *
-     * @return array{created:int,updated:int,unchanged:int,skipped:int,failed:int,cohortcreated:int,cohortupdated:int,items:array<int,array<string,string|int>>}
-     */
-    public static function sync_remote_magister_categories(): array {
+    public static function sync_remote_prodi(): array {
         global $CFG, $DB;
 
-        require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->libdir . '/filelib.php');
 
         $result = [
@@ -264,6 +209,7 @@ final class manager {
             'unchanged' => 0,
             'skipped' => 0,
             'failed' => 0,
+            'deactivated' => 0,
             'cohortcreated' => 0,
             'cohortupdated' => 0,
             'items' => [],
@@ -275,6 +221,9 @@ final class manager {
             throw new \moodle_exception('apisyncinvaliddata', self::COMPONENT);
         }
 
+        $seen = [];
+        $sortorder = 0;
+
         foreach ($items as $item) {
             $normalised = self::normalise_program_studi_item($item);
             if (!$normalised) {
@@ -282,19 +231,24 @@ final class manager {
                 continue;
             }
 
+            $normalised['sortorder'] = $sortorder++;
+
             try {
-                $synced = self::sync_one_magister_category($normalised['name'], $normalised['idnumber']);
+                $synced = self::sync_one_prodi($normalised);
                 $result[$synced['status']]++;
+                $seen[$synced['prodiid']] = true;
+
                 if (!empty($synced['cohortcreated'])) {
                     $result['cohortcreated']++;
                 } else if (!empty($synced['cohortid'])) {
                     $result['cohortupdated']++;
                 }
+
                 $result['items'][] = [
                     'status' => $synced['status'],
                     'name' => $normalised['name'],
-                    'idnumber' => $normalised['idnumber'],
-                    'categoryid' => $synced['categoryid'],
+                    'code' => $normalised['code'],
+                    'prodiid' => $synced['prodiid'],
                     'cohortid' => $synced['cohortid'],
                 ];
             } catch (\Throwable $exception) {
@@ -302,11 +256,30 @@ final class manager {
                 $result['items'][] = [
                     'status' => 'failed',
                     'name' => $normalised['name'],
-                    'idnumber' => $normalised['idnumber'],
-                    'categoryid' => 0,
+                    'code' => $normalised['code'],
+                    'prodiid' => 0,
                     'cohortid' => 0,
                     'message' => $exception->getMessage(),
                 ];
+            }
+        }
+
+        // A programme that disappeared from the API is deactivated, never deleted,
+        // so students, bills and quiz mappings pointing at it keep resolving.
+        foreach ($DB->get_records(self::TABLE_PRODI, ['active' => 1], '', 'id,name') as $prodi) {
+            if (isset($seen[(int) $prodi->id])) {
+                continue;
+            }
+
+            $DB->update_record(self::TABLE_PRODI, (object) [
+                'id' => $prodi->id,
+                'active' => 0,
+                'timemodified' => time(),
+            ]);
+            $result['deactivated']++;
+
+            if (self::should_archive_deleted()) {
+                self::archive_prodi_cohort((int) $prodi->id, (string) $prodi->name);
             }
         }
 
@@ -334,10 +307,10 @@ final class manager {
     }
 
     /**
-     * Normalise one API item. Only Magister records are returned.
+     * Normalise one API item into programme fields.
      *
      * @param mixed $item
-     * @return array{name:string,idnumber:string}|null
+     * @return array{name:string,code:string,jenjang:string,facultyname:string,facultycode:string}|null
      */
     private static function normalise_program_studi_item($item): ?array {
         if (!is_object($item)) {
@@ -345,111 +318,139 @@ final class manager {
         }
 
         $jenjang = trim((string) ($item->jenjang ?? ''));
-        if (strtolower($jenjang) !== self::SYNC_JENJANG) {
-            return null;
-        }
-
         $nama = trim((string) ($item->nama ?? ''));
         $slug = trim((string) ($item->slug ?? ''));
         if ($nama === '' || $slug === '') {
             return null;
         }
 
-        $categoryname = trim($jenjang . ' ' . $nama);
-        $idnumber = clean_param($slug, PARAM_TEXT);
+        $name = self::trim_field(trim($jenjang . ' ' . $nama), 255);
+        $code = self::trim_field(clean_param($slug, PARAM_TEXT), 100);
 
-        if (\core_text::strlen($categoryname) > 255) {
-            $categoryname = \core_text::substr($categoryname, 0, 255);
-        }
-        if (\core_text::strlen($idnumber) > 100) {
-            $idnumber = \core_text::substr($idnumber, 0, 100);
-        }
-
-        if ($categoryname === '' || $idnumber === '') {
+        if ($name === '' || $code === '') {
             return null;
         }
 
         return [
-            'name' => $categoryname,
-            'idnumber' => $idnumber,
+            'name' => $name,
+            'code' => $code,
+            'jenjang' => self::trim_field($jenjang, 50),
+            'facultyname' => self::trim_field(trim((string) ($item->unwFakultas->nama ?? '')), 255),
+            'facultycode' => self::trim_field(trim((string) ($item->unwFakultas->page_slug ?? '')), 100),
         ];
     }
 
     /**
-     * Create or update one root category from the remote API.
+     * Create or update one programme row from the remote API.
      *
-     * @return array{status:string,categoryid:int,cohortid:int,cohortcreated:bool}
+     * @param array<string,string|int> $data Normalised programme fields.
+     * @return array{status:string,prodiid:int,cohortid:int,cohortcreated:bool}
      */
-    private static function sync_one_magister_category(string $name, string $idnumber): array {
+    private static function sync_one_prodi(array $data): array {
         global $DB;
 
+        $now = time();
         $status = 'unchanged';
-        $existing = $DB->get_records('course_categories', ['idnumber' => $idnumber], 'id ASC', '*', 0, 1);
-        $record = $existing ? reset($existing) : false;
+        $existing = $DB->get_record(self::TABLE_PRODI, ['code' => $data['code']]);
 
-        if ($record) {
-            $category = \core_course_category::get((int) $record->id, MUST_EXIST, true);
-            $changes = [];
-            if ((string) $record->name !== $name) {
-                $changes['name'] = $name;
+        if ($existing) {
+            $changed = false;
+            foreach (['name', 'jenjang', 'facultyname', 'facultycode', 'sortorder'] as $field) {
+                if ((string) ($existing->$field ?? '') !== (string) $data[$field]) {
+                    $changed = true;
+                    break;
+                }
             }
-            if ((string) $record->idnumber !== $idnumber) {
-                $changes['idnumber'] = $idnumber;
-            }
-            if ((int) $record->parent !== 0) {
-                $changes['parent'] = 0;
-            }
+            $changed = $changed || (int) $existing->active !== 1;
 
-            if ($changes) {
-                $category->update((object) $changes);
+            if ($changed) {
+                $DB->update_record(self::TABLE_PRODI, (object) array_merge($data, [
+                    'id' => $existing->id,
+                    'active' => 1,
+                    'timemodified' => $now,
+                ]));
                 $status = 'updated';
             }
-            $categoryid = (int) $category->id;
+
+            $prodiid = (int) $existing->id;
         } else {
-            $category = \core_course_category::create((object) [
-                'name' => $name,
-                'idnumber' => $idnumber,
-                'parent' => 0,
-                'description' => '',
-                'descriptionformat' => FORMAT_HTML,
-                'visible' => 1,
-            ]);
-            $categoryid = (int) $category->id;
+            $prodiid = (int) $DB->insert_record(self::TABLE_PRODI, (object) array_merge($data, [
+                'active' => 1,
+                'timecreated' => $now,
+                'timemodified' => $now,
+            ]));
             $status = 'created';
         }
 
-        $cohortidnumber = self::cohort_idnumber($categoryid);
-        $cohortexisted = $DB->record_exists('cohort', ['idnumber' => $cohortidnumber]);
-        $cohortid = self::ensure_category_cohort($categoryid);
+        $cohortexisted = $DB->record_exists('cohort', ['idnumber' => self::cohort_idnumber($prodiid)]);
+        $cohortid = self::ensure_prodi_cohort($prodiid);
 
         return [
             'status' => $status,
-            'categoryid' => $categoryid,
+            'prodiid' => $prodiid,
             'cohortid' => (int) $cohortid,
             'cohortcreated' => !$cohortexisted && !empty($cohortid),
         ];
     }
 
     /**
-     * Automatically attach generated student cohort to a Moodle course.
+     * Return the programme IDs currently linked to a course.
      *
-     * The course still belongs to one primary Moodle category. For a course shared by
-     * multiple Prodi categories, pass extra category IDs from a custom flow or add
-     * additional Cohort sync instances manually.
+     * A course is linked to a programme through a Cohort sync enrolment instance
+     * pointing at that programme's generated student cohort, so the enrolment table
+     * is the source of truth.
      *
-     * @param int $courseid Moodle course ID.
-     * @param int[] $extracategoryids Extra Prodi category IDs to link.
-     * @return array{student:int,skipped:int}
+     * @return int[] Programme IDs, sorted ascending.
      */
-    public static function enrol_course_category_cohorts(int $courseid, array $extracategoryids = []): array {
+    public static function get_course_prodi(int $courseid): array {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+
+        $like = $DB->sql_like('c.idnumber', ':prefix');
+        $sql = "SELECT DISTINCT c.idnumber
+                  FROM {enrol} e
+                  JOIN {cohort} c ON c.id = e.customint1
+                 WHERE e.courseid = :courseid
+                   AND e.enrol = 'cohort'
+                   AND {$like}";
+        $records = $DB->get_fieldset_sql($sql, [
+            'courseid' => $courseid,
+            'prefix' => $DB->sql_like_escape(self::PRODI_IDNUMBER_PREFIX) . '%',
+        ]);
+
+        $prodiids = [];
+        foreach ($records as $idnumber) {
+            $prodiid = (int) substr((string) $idnumber, strlen(self::PRODI_IDNUMBER_PREFIX));
+            if ($prodiid > 0) {
+                $prodiids[] = $prodiid;
+            }
+        }
+
+        $prodiids = array_values(array_unique($prodiids));
+        sort($prodiids);
+
+        return $prodiids;
+    }
+
+    /**
+     * Make the programme Cohort sync instances of a course match the given list.
+     *
+     * Instances for newly selected programmes are added, and instances for
+     * deselected programmes are removed. Only generated student cohorts are
+     * touched, so Cohort sync methods added by hand survive untouched.
+     *
+     * @param int[] $prodiids Programme IDs that should remain linked.
+     * @return array{added:int,removed:int,skipped:int}
+     */
+    public static function set_course_prodi(int $courseid, array $prodiids): array {
         global $CFG, $DB;
 
-        $result = [
-            self::TYPE_STUDENT => 0,
-            'skipped' => 0,
-        ];
+        $result = ['added' => 0, 'removed' => 0, 'skipped' => 0];
 
-        if ($courseid <= 0 || !self::should_autoenrol_students()) {
+        if ($courseid <= 0) {
             return $result;
         }
 
@@ -465,26 +466,76 @@ final class manager {
             return $result;
         }
 
-        $categoryids = array_values(array_unique(array_filter(array_map('intval', array_merge(
-            [(int) $course->category],
-            $extracategoryids
-        )))));
+        $wanted = array_values(array_unique(array_filter(array_map('intval', $prodiids))));
+        $current = self::get_course_prodi($courseid);
 
-        foreach ($categoryids as $categoryid) {
-            $cohortid = self::ensure_category_cohort($categoryid);
+        foreach (array_diff($wanted, $current) as $prodiid) {
+            $cohortid = self::ensure_prodi_cohort((int) $prodiid);
             if (!$cohortid) {
                 $result['skipped']++;
                 continue;
             }
 
             if (self::add_cohort_enrolment($course, (int) $cohortid, 'student')) {
-                $result[self::TYPE_STUDENT]++;
+                $result['added']++;
             } else {
                 $result['skipped']++;
             }
         }
 
+        foreach (array_diff($current, $wanted) as $prodiid) {
+            $cohort = $DB->get_record('cohort', ['idnumber' => self::cohort_idnumber((int) $prodiid)]);
+            if (!$cohort) {
+                $result['skipped']++;
+                continue;
+            }
+
+            $instances = $DB->get_records('enrol', [
+                'courseid' => $courseid,
+                'enrol' => 'cohort',
+                'customint1' => (int) $cohort->id,
+            ]);
+
+            foreach ($instances as $instance) {
+                $cohortplugin->delete_instance($instance);
+                $result['removed']++;
+            }
+        }
+
         return $result;
+    }
+
+    /**
+     * Build the programme options offered by the course and user forms.
+     *
+     * @return array<int,string> Programme ID => display label.
+     */
+    public static function get_prodi_options(): array {
+        global $DB;
+
+        $options = [];
+        $records = $DB->get_records(self::TABLE_PRODI, ['active' => 1], 'sortorder ASC, name ASC', 'id,name');
+
+        foreach ($records as $record) {
+            $options[(int) $record->id] = format_string($record->name);
+        }
+
+        return $options;
+    }
+
+    /**
+     * Return one programme record, or null.
+     */
+    public static function get_prodi(int $prodiid): ?stdClass {
+        global $DB;
+
+        if ($prodiid <= 0) {
+            return null;
+        }
+
+        $record = $DB->get_record(self::TABLE_PRODI, ['id' => $prodiid]);
+
+        return $record ?: null;
     }
 
     /**
@@ -587,8 +638,8 @@ final class manager {
     /**
      * Build the generated cohort display name.
      */
-    private static function cohort_name(string $categoryname): string {
-        return self::cohort_name_prefix() . trim($categoryname);
+    private static function cohort_name(string $prodiname): string {
+        return self::cohort_name_prefix() . trim($prodiname);
     }
 
     /**
@@ -610,7 +661,16 @@ final class manager {
     /**
      * Build generated cohort description.
      */
-    private static function cohort_description(string $categoryname): string {
-        return get_string('cohortdescription', self::COMPONENT, $categoryname);
+    private static function cohort_description(string $prodiname): string {
+        return get_string('cohortdescription', self::COMPONENT, $prodiname);
+    }
+
+    /**
+     * Cut a value to the column width without breaking multibyte characters.
+     */
+    private static function trim_field(string $value, int $length): string {
+        $value = trim($value);
+
+        return \core_text::strlen($value) > $length ? \core_text::substr($value, 0, $length) : $value;
     }
 }

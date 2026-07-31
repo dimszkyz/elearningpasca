@@ -204,11 +204,6 @@ class core_course_management_renderer extends plugin_renderer_base {
             $url = new moodle_url('/course/editcategory.php', ['parent' => $category->id]);
             $actions[] = html_writer::link($url, get_string('createnewcategory'), ['class' => 'btn btn-secondary']);
         }
-        if (class_exists('\\local_pascaprodi\\manager') && has_capability('moodle/category:manage', context_system::instance())) {
-            $url = new moodle_url('/local/pascaprodi/sync_categories.php');
-            $actions[] = html_writer::link($url, get_string('synccategoriesbutton', 'local_pascaprodi'),
-                ['class' => 'btn btn-secondary']);
-        }
         if (core_course_category::can_approve_course_requests()) {
             $actions[] = html_writer::link(new moodle_url('/course/pending.php'), get_string('coursespending'),
                 ['class' => 'btn btn-secondary']);

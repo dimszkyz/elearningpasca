@@ -63,19 +63,6 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_heading(
-        'local_pascaprodi/enrolheading',
-        get_string('setting_enrolheading', 'local_pascaprodi'),
-        get_string('setting_enrolheading_desc', 'local_pascaprodi')
-    ));
-
-    $settings->add(new admin_setting_configcheckbox(
-        'local_pascaprodi/autoenrolstudents',
-        get_string('setting_autoenrolstudents', 'local_pascaprodi'),
-        get_string('setting_autoenrolstudents_desc', 'local_pascaprodi'),
-        1
-    ));
-
-    $settings->add(new admin_setting_heading(
         'local_pascaprodi/apisyncheading',
         get_string('setting_apisyncheading', 'local_pascaprodi'),
         get_string('setting_apisyncheading_desc', 'local_pascaprodi')
@@ -100,9 +87,9 @@ if ($hassiteconfig) {
     $ADMIN->add('localplugins', $settings);
 
     $ADMIN->add('localplugins', new admin_externalpage(
-        'local_pascaprodi_synccategories',
-        get_string('synccategoriespage', 'local_pascaprodi'),
-        new moodle_url('/local/pascaprodi/sync_categories.php'),
-        'moodle/category:manage'
+        'local_pascaprodi_syncprodi',
+        get_string('syncprodipage', 'local_pascaprodi'),
+        new moodle_url('/local/pascaprodi/sync_prodi.php'),
+        'moodle/site:config'
     ));
 }

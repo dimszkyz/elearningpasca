@@ -4,7 +4,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_siakad';
-$plugin->version = 2026072400;
+$plugin->version = 2026072901;
 $plugin->requires = 2026042000;
+$plugin->dependencies = [
+    'local_pascaprodi' => 2026072900,
+];
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.1.0';
+$plugin->release = '0.3.0';

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/siakad/db" VERSION="20260729" COMMENT="SIAKAD master data, installed into the standalone SIAKAD database"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
+  <TABLES>
+    <TABLE NAME="local_siakad_user" COMMENT="External SIAKAD user identities">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="moodleuserid" TYPE="int" LENGTH="10" NOTNULL="false" COMMENT="Matching {user} row in the Moodle database; no foreign key, the tables may live on different servers."/>
+        <FIELD NAME="externalid" TYPE="char" LENGTH="64" NOTNULL="true"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="100" NOTNULL="true"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="usertype" TYPE="char" LENGTH="20" NOTNULL="true"/>
+        <FIELD NAME="active" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="externalid_uniq" UNIQUE="true" FIELDS="externalid"/>
+        <INDEX NAME="email_idx" UNIQUE="false" FIELDS="email"/>
+        <INDEX NAME="moodleuserid_idx" UNIQUE="false" FIELDS="moodleuserid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siakad_prodi" COMMENT="Study programmes from SIAKAD">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="code" TYPE="char" LENGTH="100" NOTNULL="true"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true"/>
+        <FIELD NAME="pascaprodiid" TYPE="int" LENGTH="10" NOTNULL="false" COMMENT="Matching local_pascaprodi_prodi row in the Moodle database."/>
+        <FIELD NAME="active" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS><KEY NAME="primary" TYPE="primary" FIELDS="id"/></KEYS>
+      <INDEXES>
+        <INDEX NAME="code_uniq" UNIQUE="true" FIELDS="code"/>
+        <INDEX NAME="pascaprodiid_idx" UNIQUE="false" FIELDS="pascaprodiid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siakad_mahasiswa" COMMENT="Student master data">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="siakaduserid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="prodiid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="nim" TYPE="char" LENGTH="32" NOTNULL="true"/>
+        <FIELD NAME="cohortyear" TYPE="int" LENGTH="4" NOTNULL="true"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="active"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="user_fk" TYPE="foreign" FIELDS="siakaduserid" REFTABLE="local_siakad_user" REFFIELDS="id"/>
+        <KEY NAME="prodi_fk" TYPE="foreign" FIELDS="prodiid" REFTABLE="local_siakad_prodi" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES><INDEX NAME="nim_uniq" UNIQUE="true" FIELDS="nim"/></INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siakad_dosen" COMMENT="Lecturer master data">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="siakaduserid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="prodiid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="nidn" TYPE="char" LENGTH="32" NOTNULL="true"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="active"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="user_fk" TYPE="foreign" FIELDS="siakaduserid" REFTABLE="local_siakad_user" REFFIELDS="id"/>
+        <KEY NAME="prodi_fk" TYPE="foreign" FIELDS="prodiid" REFTABLE="local_siakad_prodi" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES><INDEX NAME="nidn_uniq" UNIQUE="true" FIELDS="nidn"/></INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_siakad_tagihan" COMMENT="Student billing and payment status">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mahasiswaid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="period" TYPE="char" LENGTH="20" NOTNULL="true"/>
+        <FIELD NAME="billtype" TYPE="char" LENGTH="50" NOTNULL="true"/>
+        <FIELD NAME="amount" TYPE="number" LENGTH="14" DECIMALS="2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="paidamount" TYPE="number" LENGTH="14" DECIMALS="2" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="unpaid"/>
+        <FIELD NAME="duedate" TYPE="int" LENGTH="10" NOTNULL="false"/>
+        <FIELD NAME="paidat" TYPE="int" LENGTH="10" NOTNULL="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mahasiswa_fk" TYPE="foreign" FIELDS="mahasiswaid" REFTABLE="local_siakad_mahasiswa" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES><INDEX NAME="student_period_idx" UNIQUE="false" FIELDS="mahasiswaid,period,status"/></INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

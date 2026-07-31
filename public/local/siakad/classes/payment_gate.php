@@ -1,5 +1,10 @@
 <?php
 // This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 
 namespace local_siakad;
 
@@ -7,13 +12,17 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Resolves a Moodle user's SIAKAD programme and payment eligibility.
+ *
+ * @package    local_siakad
+ * @copyright  2026
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class payment_gate {
     /**
      * Return the active student record linked to a Moodle user.
      */
     public static function get_student(int $moodleuserid): ?\stdClass {
-        global $DB;
+        $DB = external_db::get();
 
         $sql = "SELECT m.*, u.moodleuserid, u.active AS useractive
                   FROM {local_siakad_mahasiswa} m
@@ -31,31 +40,31 @@ final class payment_gate {
     }
 
     /**
+     * Return the active lecturer record linked to a Moodle user.
+     */
+    public static function get_lecturer(int $moodleuserid): ?\stdClass {
+        $DB = external_db::get();
+
+        $sql = "SELECT d.*, u.moodleuserid
+                  FROM {local_siakad_dosen} d
+                  JOIN {local_siakad_user} u ON u.id = d.siakaduserid
+                 WHERE u.moodleuserid = :userid
+                   AND u.usertype = :usertype
+                   AND u.active = 1
+                   AND d.status = :status";
+
+        return $DB->get_record_sql($sql, [
+            'userid' => $moodleuserid,
+            'usertype' => 'dosen',
+            'status' => 'active',
+        ]) ?: null;
+    }
+
+    /**
      * A student is paid when no outstanding bill exists for the selected period.
      */
     public static function is_paid(int $mahasiswaid, string $period): bool {
-        global $DB;
-
-        $period = trim($period);
-        if ($mahasiswaid <= 0 || $period === '') {
-            return false;
-        }
-
-        $bills = $DB->get_records('local_siakad_tagihan', [
-            'mahasiswaid' => $mahasiswaid,
-            'period' => $period,
-        ]);
-        if (!$bills) {
-            return false;
-        }
-
-        foreach ($bills as $bill) {
-            if ($bill->status !== 'paid' || (float) $bill->paidamount < (float) $bill->amount) {
-                return false;
-            }
-        }
-
-        return true;
+        return billing::is_settled($mahasiswaid, $period);
     }
 
     /**

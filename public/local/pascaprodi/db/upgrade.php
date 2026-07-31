@@ -22,6 +22,8 @@ defined('MOODLE_INTERNAL') || die();
 function xmldb_local_pascaprodi_upgrade(int $oldversion): bool {
     global $DB;
 
+    $dbman = $DB->get_manager();
+
     if ($oldversion < 2026071601) {
         $prefix = 'pasca:prodi-category:';
         $select = 'component = ? AND ' . $DB->sql_like('idnumber', '?', false);
@@ -73,6 +75,39 @@ function xmldb_local_pascaprodi_upgrade(int $oldversion): bool {
 
     if ($oldversion < 2026071608) {
         upgrade_plugin_savepoint(true, 2026071608, 'local', 'pascaprodi');
+    }
+
+    if ($oldversion < 2026072900) {
+        // Study programmes stop being course categories and become plugin data, so
+        // the plugin gains its first table. Existing sites created the categories
+        // already; cli/migrate_prodi_categories.php converts them.
+        $table = new xmldb_table('local_pascaprodi_prodi');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('code', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('jenjang', XMLDB_TYPE_CHAR, '50', null, null, null, null);
+        $table->add_field('facultyname', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+        $table->add_field('facultycode', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('cohortid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+        $table->add_field('sortorder', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('active', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('code_uniq', XMLDB_INDEX_UNIQUE, ['code']);
+        $table->add_index('cohortid_idx', XMLDB_INDEX_NOTUNIQUE, ['cohortid']);
+        $table->add_index('active_idx', XMLDB_INDEX_NOTUNIQUE, ['active']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // A course category no longer implies a programme, so there is nothing to
+        // derive automatically when a course is created. Programmes are chosen on
+        // the course form instead.
+        unset_config('autoenrolstudents', 'local_pascaprodi');
+
+        upgrade_plugin_savepoint(true, 2026072900, 'local', 'pascaprodi');
     }
 
     return true;

@@ -23,7 +23,6 @@ function xmldb_local_pascaprodi_install(): void {
     set_config('enabled', 1, 'local_pascaprodi');
     set_config('updatenames', 1, 'local_pascaprodi');
     set_config('archiveondeleted', 1, 'local_pascaprodi');
-    set_config('autoenrolstudents', 1, 'local_pascaprodi');
     set_config('nameprefix', get_string('defaultnameprefix', 'local_pascaprodi'), 'local_pascaprodi');
     set_config('archiveprefix', get_string('defaultarchiveprefix', 'local_pascaprodi'), 'local_pascaprodi');
     set_config('syncapiurl', \local_pascaprodi\manager::DEFAULT_API_URL, 'local_pascaprodi');

@@ -9,7 +9,7 @@
 namespace local_pascaprodi;
 
 /**
- * Helper for applying Prodi role and cohort setup when a user is created.
+ * Helper for applying role and study programme setup when a user is created.
  *
  * @package    local_pascaprodi
  * @copyright  2026
@@ -17,70 +17,53 @@ namespace local_pascaprodi;
  */
 final class user_setup {
     /**
-     * Apply role/category setup from the Add new user form.
+     * Apply role and programme setup from the Add new user form.
      *
-     * Every created user is added to the generated student cohort for each
-     * selected Prodi/category. Teacher/globalteacher/course creator/manager
-     * roles are also assigned at the selected category context so the user can
-     * keep lecturer permissions while still being grouped in the Prodi cohort.
+     * The role is assigned at system context. Programmes are not Moodle contexts,
+     * so they only drive membership of the generated student cohort, which in turn
+     * enrols the user into every course linked to that programme.
      *
      * @param int $userid Moodle user ID.
      * @param int $roleid Selected Moodle role ID, or 0 for no role change.
-     * @param int[] $categoryids Selected Prodi/category IDs.
+     * @param int[] $prodiids Selected programme IDs.
      */
-    public static function apply(int $userid, int $roleid = 0, array $categoryids = []): void {
+    public static function apply(int $userid, int $roleid = 0, array $prodiids = []): void {
         global $CFG, $DB;
 
         if ($userid <= 0) {
             return;
         }
 
-        $categoryids = self::normalise_category_ids($categoryids);
+        $prodiids = self::normalise_prodi_ids($prodiids);
         $systemcontext = \context_system::instance();
-        $role = null;
-        $iscategoryrole = false;
 
         if ($roleid > 0) {
             $role = $DB->get_record('role', ['id' => $roleid], '*', MUST_EXIST);
-            $iscategoryrole = manager::is_category_role($role);
-        }
 
-        if ($role && $iscategoryrole && $categoryids) {
-            foreach ($categoryids as $categoryid) {
-                \core_course_category::get($categoryid, MUST_EXIST, true);
-                $categorycontext = \context_coursecat::instance($categoryid);
-                require_capability('moodle/role:assign', $categorycontext);
+            // Students get their access through the programme cohort, so a system
+            // level student assignment would only widen it unnecessarily.
+            if (strtolower((string) $role->shortname) !== 'student') {
+                require_capability('moodle/role:assign', $systemcontext);
 
                 if (!$DB->record_exists('role_assignments', [
                     'roleid' => $roleid,
-                    'contextid' => $categorycontext->id,
+                    'contextid' => $systemcontext->id,
                     'userid' => $userid,
                 ])) {
-                    role_assign($roleid, $userid, $categorycontext->id);
+                    role_assign($roleid, $userid, $systemcontext->id);
                 }
-            }
-        } else if ($role && !$categoryids && strtolower((string) $role->shortname) !== 'student') {
-            require_capability('moodle/role:assign', $systemcontext);
-
-            if (!$DB->record_exists('role_assignments', [
-                'roleid' => $roleid,
-                'contextid' => $systemcontext->id,
-                'userid' => $userid,
-            ])) {
-                role_assign($roleid, $userid, $systemcontext->id);
             }
         }
 
-        if (!$categoryids) {
+        if (!$prodiids) {
             return;
         }
 
         require_once($CFG->dirroot . '/cohort/lib.php');
         require_capability('moodle/cohort:assign', $systemcontext);
 
-        foreach ($categoryids as $categoryid) {
-            \core_course_category::get($categoryid, MUST_EXIST, true);
-            $cohortid = manager::ensure_category_cohort($categoryid);
+        foreach ($prodiids as $prodiid) {
+            $cohortid = manager::ensure_prodi_cohort($prodiid);
 
             if (!$cohortid) {
                 continue;
@@ -96,34 +79,20 @@ final class user_setup {
     }
 
     /**
-     * Normalise category IDs.
+     * Normalise programme IDs coming from a Moodle form.
      *
-     * @param mixed $categoryids Raw category IDs from a Moodle form.
+     * @param mixed $prodiids Raw programme IDs.
      * @return int[]
      */
-    public static function normalise_category_ids($categoryids): array {
+    public static function normalise_prodi_ids($prodiids): array {
         $ids = [];
-        foreach ((array) $categoryids as $categoryid) {
-            $categoryid = (int) $categoryid;
-            if ($categoryid > 0) {
-                $ids[$categoryid] = $categoryid;
+        foreach ((array) $prodiids as $prodiid) {
+            $prodiid = (int) $prodiid;
+            if ($prodiid > 0) {
+                $ids[$prodiid] = $prodiid;
             }
         }
 
         return array_values($ids);
-    }
-
-    /**
-     * Check whether the selected role may be assigned to multiple Prodi categories.
-     */
-    public static function allows_multiple_categories(int $roleid): bool {
-        global $DB;
-
-        if ($roleid <= 0) {
-            return false;
-        }
-
-        $role = $DB->get_record('role', ['id' => $roleid]);
-        return $role ? manager::is_category_role($role) : false;
     }
 }

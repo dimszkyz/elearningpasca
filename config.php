@@ -8,8 +8,8 @@ $CFG->dbtype    = 'mariadb';
 $CFG->dblibrary = 'native';
 $CFG->dbhost    = '127.0.0.1';
 $CFG->dbname    = 'elearningpasca_new';
-$CFG->dbuser    = 'elearningpasca_user';
-$CFG->dbpass    = 'password';
+$CFG->dbuser    = 'root'; // Diubah: Default user Laragon
+$CFG->dbpass    = '';     // Diubah: Default password Laragon (kosong)
 $CFG->prefix    = 'mdl_';
 
 $CFG->dboptions = array (
@@ -19,11 +19,12 @@ $CFG->dboptions = array (
     'dbcollation' => 'utf8mb4_unicode_ci',
 );
 
-// Pakai 127.0.0.1, jangan localhost dulu.
-$CFG->wwwroot   = 'http://127.0.0.1:8080';
+// Diubah: Menggunakan virtual host otomatis Laragon
+// Asumsi folder project Anda bernama "elearningpasca" di D:\laragon\www\
+$CFG->wwwroot   = 'http://elearningpasca.test';
 
-// Pakai moodledata baru, jangan campur dengan install lama.
-$CFG->dataroot  = 'D:\\xamppnew\\moodledata-pasca-new';
+// Diubah: Arahkan ke folder data khusus di dalam Laragon
+$CFG->dataroot  = 'D:\\laragon\\data\\moodledata-pasca-new';
 
 $CFG->admin     = 'admin';
 $CFG->directorypermissions = 0777;
@@ -32,7 +33,8 @@ $CFG->directorypermissions = 0777;
 $CFG->session_handler_class = '\core\session\file';
 $CFG->session_file_save_path = $CFG->dataroot . '/sessions';
 
-$CFG->sessioncookie = 'MoodlePasca1278080';
+// Diubah: Sesuaikan nama session cookie agar tidak bentrok
+$CFG->sessioncookie = 'MoodlePascaLaragon';
 $CFG->cookiesecure = false;
 $CFG->cookiehttponly = true;
 
